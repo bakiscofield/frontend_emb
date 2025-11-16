@@ -1,0 +1,16 @@
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="85" fill="#2563eb"/>
+
+  <!-- Icon design - Exchange symbol -->
+  <g transform="translate(256, 256)">
+    <!-- Top arrow (Tmoney -> Flooz) -->
+    <path d="M -95 -70 L 70 -70 L 70 -95 L 120 -55 L 70 -15 L 70 -40 L -95 -40 Z" fill="#fbbf24"/>
+
+    <!-- Bottom arrow (reverse) -->
+    <path d="M 95 70 L -70 70 L -70 95 L -120 55 L -70 15 L -70 40 L 95 40 Z" fill="#10b981"/>
+
+    <!-- EMB Text -->
+    <text x="0" y="150" font-family="Arial, sans-serif" font-size="90" font-weight="bold" fill="white" text-anchor="middle">EMB</text>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#2563eb"/>
+
+  <!-- Icon design - Simplified EMB -->
+  <g transform="translate(16, 16)">
+    <!-- Exchange arrows -->
+    <path d="M -7 -5 L 5 -5 L 5 -7 L 9 -4 L 5 -1 L 5 -3 L -7 -3 Z" fill="#fbbf24"/>
+    <path d="M 7 5 L -5 5 L -5 7 L -9 4 L -5 1 L -5 3 L 7 3 Z" fill="#10b981"/>
+  </g>
+</svg>
