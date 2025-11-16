@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  emb-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://emb_back.alicebot.me
+    container_name: emb-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://emb_back.alicebot.me
+    networks:
+      - emb-network
+
+networks:
+  emb-network:
+    driver: bridge
