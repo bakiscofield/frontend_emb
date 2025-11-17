@@ -24,15 +24,25 @@ fi
 cp .env.production .env.local
 echo -e "${GREEN}✓ .env.local configuré${NC}"
 
-# 2. Installer les dépendances
+# 2. Vérifier que tous les fichiers sont présents
 echo ""
-echo "📋 Étape 2: Installation des dépendances..."
-npm install --production
+echo "📋 Étape 2: Vérification des fichiers..."
+if [ ! -d "lib" ] || [ ! -f "lib/store.ts" ] || [ ! -f "lib/api.ts" ]; then
+    echo -e "${YELLOW}⚠️  Fichiers manquants détectés, récupération depuis Git...${NC}"
+    git reset --hard HEAD
+    git pull
+fi
+echo -e "${GREEN}✓ Fichiers vérifiés${NC}"
+
+# 3. Installer les dépendances (TOUTES, pas seulement production)
+echo ""
+echo "📋 Étape 3: Installation des dépendances..."
+npm install
 echo -e "${GREEN}✓ Dépendances installées${NC}"
 
-# 3. Build Next.js
+# 4. Build Next.js
 echo ""
-echo "📋 Étape 3: Build de l'application Next.js..."
+echo "📋 Étape 4: Build de l'application Next.js..."
 npm run build
 
 if [ $? -ne 0 ]; then
@@ -42,9 +52,9 @@ fi
 
 echo -e "${GREEN}✓ Build réussi${NC}"
 
-# 4. Installer PM2 globalement
+# 5. Installer PM2 globalement
 echo ""
-echo "📋 Étape 4: Installation de PM2..."
+echo "📋 Étape 5: Installation de PM2..."
 if ! command -v pm2 &> /dev/null; then
     npm install -g pm2
     echo -e "${GREEN}✓ PM2 installé${NC}"
@@ -52,15 +62,15 @@ else
     echo -e "${GREEN}✓ PM2 déjà installé${NC}"
 fi
 
-# 5. Arrêter l'ancien processus
+# 6. Arrêter l'ancien processus
 echo ""
-echo "📋 Étape 5: Arrêt des anciens processus..."
+echo "📋 Étape 6: Arrêt des anciens processus..."
 pm2 delete emb-frontend 2>/dev/null || true
 echo -e "${GREEN}✓ Anciens processus arrêtés${NC}"
 
-# 6. Démarrer avec PM2
+# 7. Démarrer avec PM2
 echo ""
-echo "📋 Étape 6: Démarrage du frontend avec PM2..."
+echo "📋 Étape 7: Démarrage du frontend avec PM2..."
 pm2 start npm --name emb-frontend -- start
 
 if [ $? -ne 0 ]; then
@@ -70,15 +80,15 @@ fi
 
 echo -e "${GREEN}✓ Frontend démarré${NC}"
 
-# 7. Sauvegarder la config PM2
+# 8. Sauvegarder la config PM2
 echo ""
-echo "📋 Étape 7: Sauvegarde de la configuration PM2..."
+echo "📋 Étape 8: Sauvegarde de la configuration PM2..."
 pm2 save
 echo -e "${GREEN}✓ Configuration sauvegardée${NC}"
 
-# 8. Vérifier le statut
+# 9. Vérifier le statut
 echo ""
-echo "📋 Étape 8: Vérification..."
+echo "📋 Étape 9: Vérification..."
 sleep 3
 pm2 status
 
