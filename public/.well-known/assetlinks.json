@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "me.alicebot.emb_front.twa",
+    "sha256_cert_fingerprints": ["FD:1F:74:60:98:49:52:09:81:8A:9D:7D:92:91:44:0A:02:CA:85:FE:B1:D8:BE:8D:1E:29:E0:C3:73:17:49:A6"]
+  }
+}]
