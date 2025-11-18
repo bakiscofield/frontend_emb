@@ -1,5 +1,5 @@
 // Service Worker EMB avec fonctionnalités PWA avancées
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `emb-${CACHE_VERSION}`;
 const CACHE_STATIC = `emb-static-${CACHE_VERSION}`;
 const CACHE_DYNAMIC = `emb-dynamic-${CACHE_VERSION}`;
@@ -114,6 +114,10 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome extensions et autres protocoles
   if (!event.request.url.startsWith('http')) return;
+
+  // Skip API requests - Ne jamais cacher les requêtes API
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) return;
 
   // Pour les ressources statiques: Cache First (plus rapide)
   if (isStaticAsset(event.request)) {

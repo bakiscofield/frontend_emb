@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useAuthStore } from '@/lib/store';
 
 export default function RegisterServiceWorker() {
+  const initAuth = useAuthStore((state) => state.initAuth);
+
+  useEffect(() => {
+    // Initialiser l'authentification depuis localStorage
+    initAuth();
+  }, [initAuth]);
+
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
