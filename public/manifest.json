@@ -120,15 +120,37 @@
     "params": {
       "title": "title",
       "text": "text",
-      "url": "url"
+      "url": "url",
+      "files": [
+        {
+          "name": "receipt",
+          "accept": ["image/*", "application/pdf"]
+        }
+      ]
     }
   },
+  "file_handlers": [
+    {
+      "action": "/open-file",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/vnd.ms-excel": [".xls"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "application/json": [".json"],
+        "text/plain": [".txt"]
+      }
+    }
+  ],
   "protocol_handlers": [
     {
       "protocol": "web+emb",
       "url": "/transaction?id=%s"
     }
   ],
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "categories": ["finance", "business", "productivity"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "lang": "fr",
@@ -137,5 +159,9 @@
   "related_applications": [],
   "launch_handler": {
     "client_mode": ["navigate-existing", "auto"]
-  }
+  },
+  "handle_links": "preferred",
+  "scope_extensions": [
+    {"origin": "*.alicebot.me"}
+  ]
 }

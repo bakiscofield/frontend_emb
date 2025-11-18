@@ -130,10 +130,14 @@
         </div>
 
         <h1>Vous êtes hors ligne</h1>
-        <p>
+        <p id="status-text">
             Pas de connexion internet pour le moment.
             L'application EMB nécessite une connexion pour afficher les dernières transactions.
         </p>
+
+        <div id="connection-info" style="display: none; margin-bottom: 20px; padding: 12px; background: #fff3cd; border-radius: 8px; color: #856404; font-size: 14px;">
+            Reconnexion automatique dès que possible...
+        </div>
 
         <button class="retry-btn" onclick="retry()">
             <span id="btn-text">Réessayer</span>
@@ -144,51 +148,104 @@
             <a href="/" class="page-link">Accueil</a>
             <a href="/login" class="page-link">Connexion</a>
             <a href="/dashboard" class="page-link">Dashboard</a>
+            <a href="/admin/dashboard" class="page-link">Admin</a>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="font-size: 14px; color: #999;">
+                💡 <strong>Astuce:</strong> Cette page s'actualisera automatiquement lorsque vous serez à nouveau en ligne.
+            </p>
         </div>
     </div>
 
     <script>
+        let checkingConnection = false;
+
         function retry() {
+            if (checkingConnection) return;
+
             const btn = document.querySelector('.retry-btn');
             const btnText = document.getElementById('btn-text');
+            const connectionInfo = document.getElementById('connection-info');
 
+            checkingConnection = true;
             btn.disabled = true;
             btn.classList.add('checking');
             btnText.textContent = 'Vérification...';
+            connectionInfo.style.display = 'block';
 
             // Vérifier la connexion
-            fetch('/manifest.json', { method: 'HEAD' })
+            fetch('/manifest.json', { method: 'HEAD', cache: 'no-cache' })
                 .then(() => {
-                    btnText.textContent = 'Connexion rétablie !';
+                    btnText.textContent = '✓ Connexion rétablie !';
+                    connectionInfo.textContent = 'Redirection en cours...';
+                    connectionInfo.style.background = '#d4edda';
+                    connectionInfo.style.color = '#155724';
+
                     setTimeout(() => {
                         window.location.reload();
                     }, 500);
                 })
                 .catch(() => {
-                    btnText.textContent = 'Toujours hors ligne';
+                    btnText.textContent = '✗ Toujours hors ligne';
+                    connectionInfo.textContent = 'Vérifiez votre connexion internet';
+                    connectionInfo.style.background = '#f8d7da';
+                    connectionInfo.style.color = '#721c24';
+
                     setTimeout(() => {
+                        checkingConnection = false;
                         btn.disabled = false;
                         btn.classList.remove('checking');
                         btnText.textContent = 'Réessayer';
+                        connectionInfo.style.display = 'none';
                     }, 2000);
                 });
         }
 
-        // Vérifier automatiquement toutes les 10 secondes
-        setInterval(() => {
-            fetch('/manifest.json', { method: 'HEAD' })
-                .then(() => {
-                    window.location.reload();
-                })
-                .catch(() => {
-                    // Toujours hors ligne
-                });
-        }, 10000);
+        let autoCheckInterval;
 
-        // Écouter l'événement online
+        // Vérifier automatiquement toutes les 15 secondes
+        function startAutoCheck() {
+            autoCheckInterval = setInterval(() => {
+                if (!checkingConnection) {
+                    fetch('/manifest.json', { method: 'HEAD', cache: 'no-cache' })
+                        .then(() => {
+                            clearInterval(autoCheckInterval);
+                            document.getElementById('status-text').textContent = 'Connexion rétablie ! Rechargement...';
+                            setTimeout(() => window.location.reload(), 500);
+                        })
+                        .catch(() => {
+                            // Toujours hors ligne
+                        });
+                }
+            }, 15000);
+        }
+
+        // Écouter l'événement online du navigateur
         window.addEventListener('online', () => {
-            window.location.reload();
+            clearInterval(autoCheckInterval);
+            document.getElementById('connection-info').style.display = 'block';
+            document.getElementById('connection-info').textContent = 'Connexion détectée ! Vérification...';
+            document.getElementById('connection-info').style.background = '#d1ecf1';
+            document.getElementById('connection-info').style.color = '#0c5460';
+
+            // Vérifier réellement avec le serveur
+            setTimeout(() => {
+                fetch('/manifest.json', { method: 'HEAD', cache: 'no-cache' })
+                    .then(() => window.location.reload())
+                    .catch(() => {
+                        document.getElementById('connection-info').textContent = 'Connexion instable, nouvelle tentative...';
+                        startAutoCheck();
+                    });
+            }, 1000);
         });
+
+        window.addEventListener('offline', () => {
+            document.getElementById('status-text').textContent = 'Connexion perdue. En attente de reconnexion...';
+        });
+
+        // Démarrer la vérification automatique
+        startAutoCheck();
     </script>
 </body>
 </html>

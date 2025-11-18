@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
+import RegisterServiceWorker from './register-sw';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#2563eb" />
       </head>
       <body className={inter.className}>
+        <RegisterServiceWorker />
         {children}
         <Toaster 
           position="top-right"
