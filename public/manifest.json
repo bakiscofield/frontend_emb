@@ -1,12 +1,12 @@
 {
-  "name": "EMB - Échange Tmoney vers Flooz",
+  "name": "EMB - Échange Mobile Banking",
   "short_name": "EMB",
-  "description": "Application de gestion de transactions Tmoney vers Flooz",
+  "description": "Application d'échange de moyens de paiement mobile",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
-  "orientation": "portrait-primary",
+  "background_color": "#0a0e27",
+  "theme_color": "#06b6d4",
+  "orientation": "portrait",
   "scope": "/",
   "icons": [
     {
@@ -163,5 +163,6 @@
   "handle_links": "preferred",
   "scope_extensions": [
     {"origin": "*.alicebot.me"}
-  ]
+  ],
+  "gcm_sender_id": "103953800507"
 }

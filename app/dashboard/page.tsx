@@ -1,22 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/store';
-import { transactionsAPI, settingsAPI } from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, History, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { exchangePairsAPI, transactionsAPI, settingsAPI } from '@/lib/api';
+import GlassCard from '@/components/GlassCard';
+import NeonButton from '@/components/NeonButton';
+import AnimatedInput from '@/components/AnimatedInput';
+import NotificationBell from '@/components/NotificationBell';
+import Header from '@/components/Header';
+import PaymentSyntaxModal from '@/components/PaymentSyntaxModal';
+import TransactionSuccessModal from '@/components/TransactionSuccessModal';
+import ProfileModal from '@/components/ProfileModal';
+import ChatWidget from '@/components/ChatWidget';
 import toast from 'react-hot-toast';
-import { 
-  ArrowRightLeft, 
-  LogOut, 
-  History, 
-  Plus, 
-  DollarSign,
-  Phone,
-  FileText,
-  CheckCircle,
-  XCircle,
-  Clock
-} from 'lucide-react';
+import { useAuthStore } from '@/lib/store';
+
+interface ExchangePair {
+  id: number;
+  from_method_name: string;
+  from_method_icon: string;
+  to_method_name: string;
+  to_method_icon: string;
+  fee_percentage: number;
+  tax_amount: number;
+  payment_syntax_type: 'TEXTE' | 'LIEN' | 'AUTRE';
+  payment_syntax_value: string;
+  fields: Field[];
+}
+
+interface Field {
+  id: number;
+  field_name: string;
+  field_type: string;
+  field_label: string;
+  placeholder: string;
+  is_required: boolean;
+  options: string | null;
+}
 
 interface Transaction {
   id: number;
@@ -25,33 +47,47 @@ interface Transaction {
   total_amount: number;
   status: string;
   created_at: string;
-  tmoney_number: string;
-  flooz_number: string;
-}
-
-interface Bookmaker {
-  id: number;
-  name: string;
-  code: string;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, logout, initAuth } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+  const [pairs, setPairs] = useState<ExchangePair[]>([]);
+  const [selectedPair, setSelectedPair] = useState<ExchangePair | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [bookmakers, setBookmakers] = useState<Bookmaker[]>([]);
-  const [percentage, setPercentage] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState<{
+    syntaxType: 'TEXTE' | 'LIEN' | 'AUTRE';
+    syntaxValue: string;
+    totalAmount: number;
+  } | null>(null);
+  const [hasViewedSyntax, setHasViewedSyntax] = useState(false);
+  const [lastShownAmount, setLastShownAmount] = useState<number | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successTransactionData, setSuccessTransactionData] = useState<{
+    transactionId: string;
+    amount: number;
+    totalAmount: number;
+    fromMethod: string;
+    toMethod: string;
+  } | null>(null);
+
   const [formData, setFormData] = useState({
-    tmoney_number: '',
-    flooz_number: '',
+    from_number: '',
+    to_number: '',
     amount: '',
     payment_reference: '',
-    bookmaker_id: '',
     notes: '',
+    dynamic_fields: {} as Record<string, any>
   });
+
+  const [minAmount, setMinAmount] = useState(500);
+  const [maxAmount, setMaxAmount] = useState(500000);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     initAuth();
@@ -61,73 +97,188 @@ export default function DashboardPage() {
   }, [isAuthenticated, router, initAuth]);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowWelcome(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated) {
-      loadData();
+      fetchPairs();
+      fetchTransactions();
+      fetchSettings();
     }
   }, [isAuthenticated]);
 
-  const loadData = async () => {
+  // Fonction pour passer à l'étape 2 et préparer les infos de paiement
+  const goToStep2 = () => {
+    if (!selectedPair) return;
+
+    const total = calculateTotal();
+    setPaymentInfo({
+      syntaxType: selectedPair.payment_syntax_type || 'TEXTE',
+      syntaxValue: selectedPair.payment_syntax_value,
+      totalAmount: total
+    });
+    // Marquer automatiquement comme vu puisque l'utilisateur va voir la syntaxe à l'étape 2
+    setHasViewedSyntax(true);
+    setCurrentStep(2);
+  };
+
+  const fetchPairs = async () => {
     try {
-      const [transRes, bookRes, percentRes] = await Promise.all([
-        transactionsAPI.getMyTransactions(),
-        settingsAPI.getBookmakers(true),
-        settingsAPI.getPublicConfig('commission_percentage')
+      const response = await exchangePairsAPI.getAll(true);
+      setPairs(response.data.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await transactionsAPI.getMyTransactions();
+      setTransactions(response.data.transactions);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const [minRes, maxRes] = await Promise.all([
+        settingsAPI.getPublicConfig('min_amount'),
+        settingsAPI.getPublicConfig('max_amount')
       ]);
 
-      setTransactions(transRes.data.transactions);
-      setBookmakers(bookRes.data.bookmakers);
-      setPercentage(parseFloat(percentRes.data.config.value));
-    } catch (error: any) {
-      toast.error('Erreur lors du chargement des données');
+      setMinAmount(parseFloat(minRes.data.config.value));
+      setMaxAmount(parseFloat(maxRes.data.config.value));
+    } catch (error) {
+      console.error(error);
     }
   };
 
   const calculateTotal = () => {
-    const amount = parseFloat(formData.amount) || 0;
-    const commission = (amount * percentage) / 100;
-    return amount + commission;
+    if (!selectedPair || !formData.amount) return 0;
+    const amount = parseFloat(formData.amount);
+    const fee = (amount * selectedPair.fee_percentage) / 100;
+    const tax = selectedPair.tax_amount;
+    return amount + fee + tax;
+  };
+
+  const handleViewSyntax = (skipValidation = false) => {
+    if (!skipValidation && (!selectedPair || !formData.amount)) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (!selectedPair || !formData.amount) return;
+
+    const total = calculateTotal();
+    setPaymentInfo({
+      syntaxType: selectedPair.payment_syntax_type || 'TEXTE',
+      syntaxValue: selectedPair.payment_syntax_value,
+      totalAmount: total
+    });
+    setShowPaymentModal(true);
+    setHasViewedSyntax(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const amount = parseFloat(formData.amount);
+    if (amount < minAmount || amount > maxAmount) {
+      toast.error(`Le montant doit être entre ${minAmount} et ${maxAmount} FCFA`);
+      return;
+    }
+
+    // Vérifier si la syntaxe a été vue (sauf pour LIEN et si pas de syntaxe)
+    const needsReference = selectedPair?.payment_syntax_type !== 'LIEN' &&
+                          selectedPair?.payment_syntax_value &&
+                          selectedPair?.payment_syntax_value.toLowerCase().indexOf('labab') === -1;
+
+    if (needsReference && !hasViewedSyntax) {
+      toast.error('Veuillez d\'abord consulter les instructions de paiement');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await transactionsAPI.create({
-        ...formData,
-        amount: parseFloat(formData.amount),
-        bookmaker_id: formData.bookmaker_id ? parseInt(formData.bookmaker_id) : null,
+      const response = await transactionsAPI.create({
+        exchange_pair_id: selectedPair?.id,
+        from_number: formData.from_number,
+        to_number: formData.to_number,
+        amount,
+        payment_reference: formData.payment_reference || 'N/A',
+        notes: formData.notes || null,
+        dynamic_fields: formData.dynamic_fields
       });
 
-      toast.success('Transaction créée avec succès !');
+      // Préparer les données pour le modal de succès
+      const transactionId = response.data.transaction?.transaction_id || 'N/A';
+      setSuccessTransactionData({
+        transactionId,
+        amount,
+        totalAmount: calculateTotal(),
+        fromMethod: selectedPair?.from_method_name || '',
+        toMethod: selectedPair?.to_method_name || ''
+      });
+
+      // Afficher le modal de succès
+      setShowSuccessModal(true);
+
+      // Pour les liens, informer que le lien sera envoyé après validation
+      if (selectedPair?.payment_syntax_type === 'LIEN') {
+        toast.success('Le lien de paiement vous sera envoyé après validation de votre demande', {
+          duration: 5000
+        });
+      }
+
+      setSelectedPair(null);
+      setHasViewedSyntax(false);
+      setLastShownAmount(null);
+      setCurrentStep(1);
       setFormData({
-        tmoney_number: '',
-        flooz_number: '',
+        from_number: '',
+        to_number: '',
         amount: '',
         payment_reference: '',
-        bookmaker_id: '',
         notes: '',
+        dynamic_fields: {}
       });
-      loadData();
-      setActiveTab('history');
+      fetchTransactions();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Erreur lors de la création');
+      toast.error(error.response?.data?.message || 'Une erreur est survenue');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleProfileUpdate = async () => {
+    // Rafraîchir les données utilisateur depuis le store
+    await initAuth();
+    toast.success('Profil mis à jour');
+  };
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <span className="badge badge-pending"><Clock className="w-3 h-3 mr-1" />En attente</span>;
-      case 'validated':
-        return <span className="badge badge-validated"><CheckCircle className="w-3 h-3 mr-1" />Validé</span>;
-      case 'rejected':
-        return <span className="badge badge-rejected"><XCircle className="w-3 h-3 mr-1" />Rejeté</span>;
-      default:
-        return <span className="badge">{status}</span>;
-    }
+    const badges: Record<string, { class: string; icon: any; label: string }> = {
+      pending: { class: 'badge-pending', icon: Clock, label: 'En attente' },
+      validated: { class: 'badge-validated', icon: CheckCircle, label: 'Validée' },
+      rejected: { class: 'badge-rejected', icon: XCircle, label: 'Rejetée' }
+    };
+
+    const badge = badges[status] || badges.pending;
+    const Icon = badge.icon;
+
+    return (
+      <span className={`badge ${badge.class} flex items-center gap-1`}>
+        <Icon className="w-3 h-3" />
+        {badge.label}
+      </span>
+    );
   };
 
   if (!isAuthenticated || !user) {
@@ -135,230 +286,485 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">EMB</h1>
-              <p className="text-sm text-gray-600">Bienvenue, {user.name}</p>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                router.push('/login');
-              }}
-              className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+    <>
+      {/* Header EMILE TRANSFER+ avec logo */}
+      <Header
+        title="EMILE TRANSFER"
+        subtitle="Effectuez vos échanges en toute sécurité"
+        userName={user.name}
+        isVerified={user.kyc_verified}
+        onProfileClick={() => setShowProfileModal(true)}
+        onLogout={() => {
+          logout();
+          router.push('/login');
+        }}
+      >
+        <NotificationBell />
+      </Header>
+
+      <div className="min-h-screen p-3 sm:p-6 relative">
+        {/* Grille de fond */}
+        <div className="cyber-grid"></div>
+
+        <div className="relative z-10 max-w-7xl mx-auto">
+          {/* Welcome Message */}
+          <AnimatePresence>
+            {showWelcome && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-6 sm:mb-8"
+              >
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2 drop-shadow-lg">
+                  Bienvenue, {user.name} 👋
+                </h1>
+                <p className="text-gray-400">Effectuez vos transactions en toute sécurité</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+        {/* Actions */}
+        <div className="flex gap-2 sm:gap-3 mb-6 sm:mb-8">
+          <NeonButton
+            variant={showHistory ? 'primary' : 'secondary'}
+            onClick={() => {
+              setShowHistory(!showHistory);
+              setSelectedPair(null);
+              setHasViewedSyntax(false);
+              setLastShownAmount(null);
+              setCurrentStep(1);
+            }}
+            fullWidth
+          >
+            <History className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">{showHistory ? 'Nouvel échange' : 'Historique'}</span>
+          </NeonButton>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {/* Exchange Pairs Selection */}
+          {!selectedPair && !showHistory && (
+            <motion.div
+              key="pairs"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
             >
-              <LogOut className="w-5 h-5" />
-              <span>Déconnexion</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="flex gap-4 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('new')}
-            className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-              activeTab === 'new'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Plus className="w-5 h-5 inline mr-2" />
-            Nouvelle transaction
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 font-medium border-b-2 transition-colors ${
-              activeTab === 'history'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <History className="w-5 h-5 inline mr-2" />
-            Historique
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'new' ? (
-          <div className="max-w-2xl mx-auto">
-            <div className="card">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-primary-100 p-3 rounded-lg">
-                  <ArrowRightLeft className="w-6 h-6 text-primary-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Nouvelle transaction</h2>
-                  <p className="text-sm text-gray-600">Échange Tmoney vers Flooz</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">
-                      <Phone className="w-4 h-4 inline mr-2" />
-                      Numéro Tmoney (source)
-                    </label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      placeholder="+228 XX XX XX XX"
-                      value={formData.tmoney_number}
-                      onChange={(e) => setFormData({ ...formData, tmoney_number: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="form-label">
-                      <Phone className="w-4 h-4 inline mr-2" />
-                      Numéro Flooz (destination)
-                    </label>
-                    <input
-                      type="tel"
-                      className="form-input"
-                      placeholder="+228 XX XX XX XX"
-                      value={formData.flooz_number}
-                      onChange={(e) => setFormData({ ...formData, flooz_number: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">
-                    <DollarSign className="w-4 h-4 inline mr-2" />
-                    Montant (FCFA)
-                  </label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    placeholder="Montant à échanger"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    required
-                    min="1"
-                  />
-                  {formData.amount && (
-                    <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                      <div className="text-sm text-gray-600">
-                        Commission ({percentage}%): <span className="font-medium">{((parseFloat(formData.amount) * percentage) / 100).toFixed(0)} FCFA</span>
-                      </div>
-                      <div className="text-lg font-bold text-primary-600 mt-1">
-                        Total à payer: {calculateTotal().toFixed(0)} FCFA
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="form-label">
-                    <FileText className="w-4 h-4 inline mr-2" />
-                    Référence de paiement
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Référence de votre paiement Tmoney"
-                    value={formData.payment_reference}
-                    onChange={(e) => setFormData({ ...formData, payment_reference: e.target.value })}
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Effectuez d'abord le paiement Tmoney, puis entrez la référence ici
-                  </p>
-                </div>
-
-                <div>
-                  <label className="form-label">Bookmaker (optionnel)</label>
-                  <select
-                    className="form-input"
-                    value={formData.bookmaker_id}
-                    onChange={(e) => setFormData({ ...formData, bookmaker_id: e.target.value })}
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
+                Choisissez votre échange
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                {pairs.map((pair, index) => (
+                  <motion.div
+                    key={pair.id}
+                    className="card-emile p-4 sm:p-6 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+                    onClick={() => {
+                      setSelectedPair(pair);
+                      setHasViewedSyntax(false);
+                      setLastShownAmount(null);
+                      setCurrentStep(1);
+                    }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.1 }}
                   >
-                    <option value="">Sélectionnez un bookmaker</option>
-                    {bookmakers.map((bm) => (
-                      <option key={bm.id} value={bm.id}>
-                        {bm.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label">Notes (optionnel)</label>
-                  <textarea
-                    className="form-input"
-                    rows={3}
-                    placeholder="Informations supplémentaires..."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-primary w-full"
-                  disabled={loading}
-                >
-                  {loading ? 'Envoi...' : 'Soumettre la transaction'}
-                </button>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Mes transactions</h2>
-            {transactions.length === 0 ? (
-              <div className="card text-center py-12">
-                <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600">Aucune transaction pour le moment</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {transactions.map((transaction) => (
-                  <div key={transaction.id} className="card hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-mono text-sm font-medium text-gray-900">
-                            {transaction.transaction_id}
-                          </span>
-                          {getStatusBadge(transaction.status)}
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-2 text-sm text-gray-600">
-                          <div>Tmoney: {transaction.tmoney_number}</div>
-                          <div>Flooz: {transaction.flooz_number}</div>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-2">
-                          {new Date(transaction.created_at).toLocaleString('fr-FR')}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">
-                          {transaction.amount.toFixed(0)} FCFA
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Total: {transaction.total_amount.toFixed(0)} FCFA
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                      <span className="text-4xl sm:text-5xl">{pair.from_method_icon}</span>
+                      <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-emile-red animate-pulse" />
+                      <span className="text-4xl sm:text-5xl">{pair.to_method_icon}</span>
                     </div>
-                  </div>
+
+                    <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
+                      {pair.from_method_name} → {pair.to_method_name}
+                    </h3>
+
+                    <div className="space-y-1 sm:space-y-2 text-center">
+                      <div className="text-xs sm:text-sm text-gray-300">
+                        Frais: <span className="text-emile-red font-bold">{pair.fee_percentage}%</span>
+                      </div>
+                      {pair.tax_amount > 0 && (
+                        <div className="text-xs sm:text-sm text-gray-300">
+                          Taxe: <span className="text-emile-red font-bold">{pair.tax_amount} FCFA</span>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+
+          {/* Exchange Form */}
+          {selectedPair && !showHistory && (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <div className="card-emile max-w-2xl mx-auto p-4 sm:p-6 md:p-8">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    <span className="text-3xl sm:text-4xl">{selectedPair.from_method_icon}</span>
+                    <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-emile-red" />
+                    <span className="text-3xl sm:text-4xl">{selectedPair.to_method_icon}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedPair(null);
+                      setHasViewedSyntax(false);
+                      setLastShownAmount(null);
+                      setCurrentStep(1);
+                    }}
+                    className="text-gray-400 hover:text-white text-xl sm:text-2xl p-2 -m-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-emile-red mb-4 sm:mb-6">
+                  {selectedPair.from_method_name} → {selectedPair.to_method_name}
+                </h2>
+
+                {/* Indicateur d'étapes */}
+                <div className="flex items-center justify-center mb-6 gap-2">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 1 ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-400'} font-bold text-sm`}>
+                    1
+                  </div>
+                  <div className={`h-1 w-12 ${currentStep >= 2 ? 'bg-red-500' : 'bg-gray-700'}`}></div>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 2 ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-400'} font-bold text-sm`}>
+                    2
+                  </div>
+                </div>
+
+                <form onSubmit={currentStep === 1 ? (e) => { e.preventDefault(); goToStep2(); } : handleSubmit} className="space-y-4 sm:space-y-6">
+                  {/* ÉTAPE 1: Informations de base */}
+                  {currentStep === 1 && (
+                    <>
+                      <AnimatedInput
+                        label={`Numéro ${selectedPair.from_method_name} (source)`}
+                        type="tel"
+                        placeholder={`Ex: 90123456`}
+                        value={formData.from_number}
+                        onChange={(e) => setFormData({ ...formData, from_number: e.target.value })}
+                        required
+                      />
+
+                      <AnimatedInput
+                        label={`Numéro ${selectedPair.to_method_name} (destination)`}
+                        type="tel"
+                        placeholder={`Ex: 70123456`}
+                        value={formData.to_number}
+                        onChange={(e) => setFormData({ ...formData, to_number: e.target.value })}
+                        required
+                      />
+
+                      <AnimatedInput
+                        label="Montant"
+                        type="number"
+                        step="1"
+                        min={minAmount}
+                        max={maxAmount}
+                        placeholder={`Entre ${minAmount} et ${maxAmount} FCFA`}
+                        value={formData.amount}
+                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                        required
+                        suffix="FCFA"
+                      />
+
+                      {/* Dynamic Fields */}
+                      {selectedPair.fields?.map((field) => {
+                    if (field.field_type === 'select' && field.options) {
+                      const options = typeof field.options === 'string'
+                        ? JSON.parse(field.options)
+                        : field.options;
+
+                      return (
+                        <div key={field.id}>
+                          <label className="block text-sm font-medium text-gray-200 mb-2">
+                            {field.field_label}
+                            {field.is_required && <span className="text-red-400 ml-1">*</span>}
+                          </label>
+                          <select
+                            className="form-input"
+                            required={field.is_required}
+                            value={formData.dynamic_fields[field.field_name] || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                dynamic_fields: {
+                                  ...formData.dynamic_fields,
+                                  [field.field_name]: e.target.value
+                                }
+                              })
+                            }
+                          >
+                            <option value="">Sélectionner...</option>
+                            {options.map((opt: string, i: number) => (
+                              <option key={i} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <AnimatedInput
+                        key={field.id}
+                        label={field.field_label}
+                        type={field.field_type === 'file' ? 'text' : field.field_type}
+                        placeholder={field.placeholder}
+                        required={field.is_required}
+                        value={formData.dynamic_fields[field.field_name] || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            dynamic_fields: {
+                              ...formData.dynamic_fields,
+                              [field.field_name]: e.target.value
+                            }
+                          })
+                        }
+                      />
+                    );
+                  })}
+
+                      <button type="submit" className="btn-emile-primary w-full">
+                        <span className="text-sm sm:text-base">Continuer →</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* ÉTAPE 2: Syntaxe de paiement et confirmation */}
+                  {currentStep === 2 && paymentInfo && (
+                    <>
+                      {/* Affichage de la syntaxe inline */}
+                      {paymentInfo.syntaxType === 'TEXTE' && paymentInfo.syntaxValue && paymentInfo.syntaxValue.toLowerCase().indexOf('labab') === -1 && (
+                        <div className="bg-gray-900/50 border-2 border-red-500/30 rounded-xl p-4 sm:p-6 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 sm:p-3 bg-red-500/20 rounded-lg">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-lg sm:text-xl font-bold text-white">Instructions de Paiement</h3>
+                                <p className="text-gray-400 text-xs sm:text-sm">Veuillez suivre ces instructions</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(paymentInfo.syntaxValue.replace(/{montant}/g, paymentInfo.totalAmount.toString()));
+                                  toast.success('Syntaxe copiée!');
+                                } catch (error) {
+                                  toast.error('Erreur lors de la copie');
+                                }
+                              }}
+                              className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
+                              title="Copier la syntaxe"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          <div className="bg-black/30 rounded-lg p-3 sm:p-4 border border-red-500/20">
+                            <p className="text-white text-base sm:text-lg font-mono leading-relaxed whitespace-pre-wrap">
+                              {paymentInfo.syntaxValue.replace(/{montant}/g, paymentInfo.totalAmount.toString())}
+                            </p>
+                          </div>
+
+                          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 sm:p-4">
+                            <p className="text-yellow-400 text-xs sm:text-sm">
+                              <span className="font-semibold">Montant à payer:</span> <span className="font-bold text-base sm:text-lg">{paymentInfo.totalAmount} FCFA</span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Message pour les liens */}
+                      {selectedPair.payment_syntax_type === 'LIEN' && (
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                          <p className="text-sm text-blue-400">
+                            ℹ️ Le lien de paiement vous sera envoyé par email après validation de votre demande par un administrateur.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Message pour Labab */}
+                      {selectedPair.payment_syntax_value && selectedPair.payment_syntax_value.toLowerCase().indexOf('labab') !== -1 && (
+                        <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                          <p className="text-sm text-purple-400">
+                            ℹ️ Pas de référence requise pour ce type de transaction.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Champ référence de paiement */}
+                      {selectedPair.payment_syntax_type !== 'LIEN' &&
+                       (!selectedPair.payment_syntax_value || selectedPair.payment_syntax_value.toLowerCase().indexOf('labab') === -1) && (
+                        <AnimatedInput
+                          label="Référence de paiement"
+                          placeholder="Ex: TM123456789"
+                          value={formData.payment_reference}
+                          onChange={(e) => setFormData({ ...formData, payment_reference: e.target.value })}
+                          required
+                        />
+                      )}
+
+                      <AnimatedInput
+                        label="Notes (optionnel)"
+                        placeholder="Informations supplémentaires..."
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      />
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentStep(1)}
+                          className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                        >
+                          ← Retour
+                        </button>
+                        <button type="submit" className="flex-[2] btn-emile-primary" disabled={loading}>
+                          <span className="text-sm sm:text-base">{loading ? 'En cours...' : 'Confirmer l\'échange'}</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Transaction History */}
+          {showHistory && (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Historique des transactions</h2>
+                <button
+                  onClick={fetchTransactions}
+                  className="btn-emile-secondary flex items-center gap-2 text-sm"
+                >
+                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Actualiser</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 sm:space-y-4">
+                {transactions.length === 0 ? (
+                  <div className="card-emile p-6 sm:p-8 text-center">
+                    <p className="text-sm sm:text-base text-gray-300">Aucune transaction pour le moment</p>
+                  </div>
+                ) : (
+                  transactions.map((tx, index) => (
+                    <motion.div
+                      key={tx.id}
+                      className="card-emile p-4 sm:p-6"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white truncate">
+                              {tx.transaction_id}
+                            </h3>
+                            {getStatusBadge(tx.status)}
+                          </div>
+                          <div className="text-xs sm:text-sm text-gray-400">
+                            {new Date(tx.created_at).toLocaleString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-lg sm:text-xl md:text-2xl font-bold text-emile-red whitespace-nowrap">
+                            {tx.total_amount} F
+                          </div>
+                          <div className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">
+                            {tx.amount} FCFA
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        </div>
       </div>
-    </div>
+
+      {/* Modal Syntaxe de Paiement */}
+      {paymentInfo && (
+        <PaymentSyntaxModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setPaymentInfo(null);
+            setHasViewedSyntax(true); // Marquer comme vu quand l'utilisateur ferme la modale
+          }}
+          syntaxType={paymentInfo.syntaxType}
+          syntaxValue={paymentInfo.syntaxValue}
+          totalAmount={paymentInfo.totalAmount}
+        />
+      )}
+
+      {/* Modal de Succès */}
+      {successTransactionData && (
+        <TransactionSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false);
+            setSuccessTransactionData(null);
+          }}
+          transactionId={successTransactionData.transactionId}
+          amount={successTransactionData.amount}
+          totalAmount={successTransactionData.totalAmount}
+          fromMethod={successTransactionData.fromMethod}
+          toMethod={successTransactionData.toMethod}
+        />
+      )}
+
+      {/* Profile Modal */}
+      {user && (
+        <ProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          user={{
+            id: user.id,
+            name: user.name,
+            email: user.email || '',
+            phone: user.phone,
+            kyc_verified: user.kyc_verified === 1,
+            kyc_status: user.kyc_status || 'pending'
+          }}
+          onProfileUpdate={handleProfileUpdate}
+        />
+      )}
+
+      {/* Chat Widget */}
+      <ChatWidget />
+    </>
   );
 }

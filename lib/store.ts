@@ -1,10 +1,13 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface User {
   id: number;
   phone: string;
   name: string;
   email?: string;
+  kyc_verified?: boolean;
+  kyc_status?: string;
 }
 
 interface Admin {
@@ -19,7 +22,7 @@ interface AuthStore {
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  
+
   setUser: (user: User, token: string) => void;
   setAdmin: (admin: Admin, token: string) => void;
   logout: () => void;
@@ -27,66 +30,77 @@ interface AuthStore {
   initAuth: () => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  admin: null,
-  token: null,
-  isAuthenticated: false,
-  isAdmin: false,
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      admin: null,
+      token: null,
+      isAuthenticated: false,
+      isAdmin: false,
 
-  setUser: (user, token) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-    }
-    set({ user, token, isAuthenticated: true, isAdmin: false });
-  },
+      setUser: (user, token) => {
+        set({
+          user,
+          token,
+          isAuthenticated: true,
+          isAdmin: false,
+          admin: null // Clear admin data when user logs in
+        });
+      },
 
-  setAdmin: (admin, token) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token);
-      localStorage.setItem('admin', JSON.stringify(admin));
-    }
-    set({ admin, token, isAuthenticated: true, isAdmin: true });
-  },
+      setAdmin: (admin, token) => {
+        set({
+          admin,
+          token,
+          isAuthenticated: true,
+          isAdmin: true,
+          user: null // Clear user data when admin logs in
+        });
+      },
 
-  logout: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
-    set({ user: null, token: null, isAuthenticated: false, isAdmin: false });
-  },
+      logout: () => {
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isAdmin: false,
+          admin: null
+        });
+      },
 
-  logoutAdmin: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('admin');
-    }
-    set({ admin: null, token: null, isAuthenticated: false, isAdmin: false });
-  },
+      logoutAdmin: () => {
+        set({
+          admin: null,
+          token: null,
+          isAuthenticated: false,
+          isAdmin: false,
+          user: null
+        });
+      },
 
-  initAuth: () => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      const userStr = localStorage.getItem('user');
-      const adminStr = localStorage.getItem('admin');
-
-      if (token && userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          set({ user, token, isAuthenticated: true, isAdmin: false });
-        } catch (error) {
-          console.error('Error parsing user data:', error);
+      initAuth: () => {
+        // With persist middleware, this is handled automatically
+        // But we keep it for backwards compatibility
+        const state = get();
+        if (state.token && (state.user || state.admin)) {
+          set({
+            isAuthenticated: true,
+            isAdmin: !!state.admin
+          });
         }
-      } else if (token && adminStr) {
-        try {
-          const admin = JSON.parse(adminStr);
-          set({ admin, token, isAuthenticated: true, isAdmin: true });
-        } catch (error) {
-          console.error('Error parsing admin data:', error);
-        }
-      }
+      },
+    }),
+    {
+      name: 'emb-auth-storage', // unique name for localStorage key
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        admin: state.admin,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+        isAdmin: state.isAdmin,
+      }),
     }
-  },
-}));
+  )
+);

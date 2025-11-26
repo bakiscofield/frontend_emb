@@ -3,25 +3,179 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* ========== PALETTE OFFICIELLE EMILE TRANSFER+ ========== */
+
+  /* === Rouge (Actions principales) === */
+  --red-primary: #FF3B38;
+  --red-dark: #CC2F2D;
+  --red-light: #FF6663;
+  --red-glow: #FF5753;
+
+  /* === Vert (Succès / Validation) === */
+  --green-primary: #14D969;
+  --green-dark: #10B054;
+  --green-light: #3FE585;
+  --green-glow: #28E073;
+
+  /* === Noir & Gris === */
+  --black: #000000;
+  --black-soft: #1A1A1A;
+  --gray-900: #1F1F1F;
+  --gray-800: #2A2A2A;
+  --gray-700: #4C4C4C;
+  --gray-600: #6B6B6B;
+  --gray-500: #8F8F8F;
+  --gray-400: #B0B0B0;
+  --gray-300: #DCDCDC;
+  --gray-200: #EFEFEF;
+  --gray-100: #F5F5F5;
+
+  /* === Warning & Error === */
+  --warning: #FF9500;
+  --warning-light: #FFB340;
+  --error: #DC2626;
+  --error-light: #EF4444;
+
+  /* ===== MODE CLAIR (Actif par défaut) ===== */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F5;
+  --bg-card: #FFFFFF;
+  --bg-hover: #EFEFEF;
+  --border-light: #DCDCDC;
+  --border-medium: #B0B0B0;
+  --text-primary: #000000;
+  --text-secondary: #4C4C4C;
+  --text-tertiary: #8F8F8F;
+
+  /* ===== MODE SOMBRE ===== */
+  --bg-primary-dark: #0A0A0A;
+  --bg-secondary-dark: #1A1A1A;
+  --bg-card-dark: #1F1F1F;
+  --bg-hover-dark: #2A2A2A;
+  --border-dark: rgba(255, 255, 255, 0.1);
+  --border-medium-dark: rgba(255, 255, 255, 0.2);
+  --text-primary-dark: #FFFFFF;
+  --text-secondary-dark: #B0B0B0;
+  --text-tertiary-dark: #6B6B6B;
+
+  /* === Effets néon === */
+  --neon-glow-red: 0 0 20px var(--red-primary), 0 0 40px var(--red-primary);
+  --neon-glow-green: 0 0 20px var(--green-primary), 0 0 40px var(--green-primary);
+
+  /* === Compatibilité (anciennes variables) === */
+  --emile-red-neon: var(--red-primary);
+  --emile-red-glow: var(--red-glow);
+  --emile-green-neon: var(--green-primary);
+  --emile-green-glow: var(--green-glow);
+  --emile-bg-dark: var(--bg-primary-dark);
+  --emile-bg-smoke: var(--bg-secondary-dark);
+  --emile-bg-card: var(--bg-card-dark);
+  --emile-bg-hover: var(--bg-hover-dark);
+  --emile-text-primary: var(--text-primary-dark);
+  --emile-text-secondary: var(--text-secondary-dark);
+  --emile-text-dark: var(--text-primary);
+  --emile-border: var(--border-dark);
+  --emile-border-hover: rgba(255, 59, 56, 0.3);
+
 }
 
+/* Fond professionnel EMILE TRANSFER+ - Dégradé sophistiqué */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: linear-gradient(135deg, #000000 0%, #1A1A1A 40%, #0A0A0A 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #FFFFFF;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  position: relative;
+  /* Désactiver le pull-to-refresh sur mobile */
+  overscroll-behavior-y: contain;
+  -webkit-overscroll-behavior-y: contain;
 }
 
-/* Animations personnalisées */
+/* Désactiver le pull-to-refresh sur toute l'app */
+html {
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+}
+
+/* Fond animé avec particules néon rouge (#FF3B38) et vert (#14D969) */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(255, 59, 56, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 59, 56, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(20, 217, 105, 0.06) 0%, transparent 50%);
+  animation: gradientShift 15s ease infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+/* Grid animé en arrière-plan - Rouge néon #FF3B38 */
+.cyber-grid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(255, 59, 56, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 59, 56, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
+  animation: gridMove 20s linear infinite;
+}
+
+@keyframes gridMove {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(50px, 50px);
+  }
+}
+
+/* Animations futuristes */
+@keyframes neonPulse {
+  0%, 100% {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+  50% {
+    text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
 @keyframes slideIn {
   from {
-    transform: translateY(10px);
+    transform: translateY(30px);
     opacity: 0;
   }
   to {
@@ -30,54 +184,583 @@ body {
   }
 }
 
-.animate-slide-in {
-  animation: slideIn 0.3s ease-out;
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
-/* Styles pour les formulaires */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 40px rgba(6, 182, 212, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.6), 0 0 60px rgba(6, 182, 212, 0.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 0.5s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInFromRight 0.5s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-neon-pulse {
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Glass Morphism */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card-hover {
+  transition: all 0.3s ease;
+}
+
+.glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(6, 182, 212, 0.3);
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px 0 rgba(6, 182, 212, 0.2);
+}
+
+/* Neon Text */
+.neon-text {
+  color: var(--cyber-cyan);
+  text-shadow: 0 0 10px var(--cyber-cyan), 0 0 20px var(--cyber-cyan), 0 0 30px var(--cyber-cyan);
+}
+
+.neon-text-purple {
+  color: var(--cyber-purple);
+  text-shadow: 0 0 10px var(--cyber-purple), 0 0 20px var(--cyber-purple);
+}
+
+.neon-text-pink {
+  color: var(--cyber-pink);
+  text-shadow: 0 0 10px var(--cyber-pink), 0 0 20px var(--cyber-pink);
+}
+
+/* Formulaires futuristes */
 .form-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+  @apply w-full px-4 py-3 rounded-xl text-base transition-all duration-300;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+.form-input:focus {
+  @apply outline-none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--cyber-cyan);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.form-input::placeholder {
+  color: rgba(248, 250, 252, 0.4);
 }
 
 .form-label {
-  @apply block text-sm font-medium text-gray-700 mb-2;
+  @apply block text-sm font-medium mb-2;
+  color: #e2e8f0;
 }
 
-/* Styles pour les boutons */
+/* Boutons avec effets néon */
 .btn-primary {
-  @apply bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  color: white;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.6), 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-secondary {
-  @apply bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 focus:ring-4 focus:ring-gray-100 transition-all;
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(6, 182, 212, 0.5);
+  transform: translateY(-2px);
 }
 
 .btn-danger {
-  @apply bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 focus:ring-4 focus:ring-red-200 transition-all;
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
 }
 
 .btn-success {
-  @apply bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition-all;
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
 }
 
-/* Styles pour les cartes */
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.6);
+}
+
+/* Cartes futuristes */
 .card {
-  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+  @apply rounded-2xl p-6 transition-all duration-300;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-/* Styles pour le status badge */
+.card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: 0 12px 40px rgba(6, 182, 212, 0.2);
+  transform: translateY(-5px);
+}
+
+/* Badges avec effets néon */
 .badge {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold;
 }
 
 .badge-pending {
-  @apply bg-yellow-100 text-yellow-800;
+  background: rgba(250, 204, 21, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
 }
 
 .badge-validated {
-  @apply bg-green-100 text-green-800;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
 }
 
 .badge-rejected {
-  @apply bg-red-100 text-red-800;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.5);
+}
+
+/* Effets de loading futuristes */
+.loading-dots::after {
+  content: '';
+  animation: loadingDots 1.5s infinite;
+}
+
+@keyframes loadingDots {
+  0%, 20% {
+    content: '.';
+  }
+  40% {
+    content: '..';
+  }
+  60%, 100% {
+    content: '...';
+  }
+}
+
+/* Responsive mobile */
+@media (max-width: 640px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-success {
+    @apply py-4 text-base;
+    min-height: 48px;
+  }
+
+  .form-input {
+    @apply py-3.5 text-base;
+    min-height: 48px;
+  }
+
+  .card {
+    @apply p-4 rounded-xl;
+  }
+}
+
+/* Dividers avec effet néon */
+.neon-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(6, 182, 212, 0.5) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+}
+
+/* Table futuriste */
+.cyber-table {
+  @apply w-full;
+}
+
+.cyber-table thead {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 2px solid rgba(6, 182, 212, 0.3);
+}
+
+.cyber-table th {
+  @apply px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider;
+  color: var(--cyber-cyan);
+}
+
+.cyber-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.cyber-table tbody tr:hover {
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.cyber-table td {
+  @apply px-4 py-3 text-sm;
+}
+
+/* ========================================
+   CLASSES EMILE TRANSFER+ (Rouge + Vert Néon)
+   ======================================== */
+
+/* Boutons EMILE avec effet néon rouge */
+.btn-emile-primary {
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, var(--emile-red-neon) 0%, var(--emile-red-glow) 100%);
+  color: white;
+  box-shadow: var(--neon-glow-red);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-emile-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px var(--emile-red-neon), 0 0 60px var(--emile-red-neon), 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-emile-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Bouton succès avec vert néon */
+.btn-emile-success {
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: linear-gradient(135deg, var(--emile-green-neon) 0%, var(--emile-green-glow) 100%);
+  color: var(--emile-text-dark);
+  box-shadow: var(--neon-glow-green);
+}
+
+.btn-emile-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px var(--emile-green-neon), 0 0 60px var(--emile-green-neon);
+}
+
+/* Bouton danger avec rouge néon */
+.btn-emile-danger {
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: linear-gradient(135deg, var(--emile-red-neon) 0%, var(--emile-red-glow) 100%);
+  color: white;
+  box-shadow: var(--neon-glow-red);
+}
+
+.btn-emile-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px var(--emile-red-neon), 0 0 60px var(--emile-red-neon);
+}
+
+/* Bouton secondaire glass effect */
+.btn-emile-secondary {
+  @apply px-6 py-3.5 rounded-xl font-semibold transition-all duration-300;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--emile-border);
+  color: var(--emile-text-primary);
+}
+
+.btn-emile-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--emile-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.2);
+}
+
+/* Cartes EMILE avec glass morphism */
+.card-emile {
+  @apply rounded-2xl p-6 transition-all duration-300;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--emile-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.card-emile:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--emile-border-hover);
+  box-shadow: 0 12px 40px rgba(255, 0, 51, 0.15);
+  transform: translateY(-5px);
+}
+
+/* Input EMILE avec effet focus rouge */
+.input-emile {
+  @apply w-full px-4 py-3 rounded-xl text-base transition-all duration-300;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid var(--emile-border);
+  color: var(--emile-text-primary);
+}
+
+.input-emile:focus {
+  @apply outline-none;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--emile-red-neon);
+  box-shadow: 0 0 20px rgba(255, 0, 51, 0.3);
+}
+
+.input-emile::placeholder {
+  color: var(--emile-text-secondary);
+}
+
+/* Badge statut rouge néon */
+.badge-emile-active {
+  @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold;
+  background: rgba(255, 0, 51, 0.1);
+  color: var(--emile-red-neon);
+  border: 1px solid rgba(255, 0, 51, 0.3);
+  box-shadow: 0 0 10px rgba(255, 0, 51, 0.2);
+}
+
+/* Badge succès vert néon */
+.badge-emile-success {
+  @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold;
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--emile-green-neon);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+/* Badge en attente */
+.badge-emile-pending {
+  @apply inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--emile-text-secondary);
+  border: 1px solid var(--emile-border);
+}
+
+/* Texte néon rouge EMILE */
+.text-emile-red {
+  color: var(--emile-red-neon);
+  text-shadow: 0 0 10px var(--emile-red-neon), 0 0 20px var(--emile-red-neon), 0 0 30px var(--emile-red-neon);
+}
+
+/* Texte néon vert EMILE */
+.text-emile-green {
+  color: var(--emile-green-neon);
+  text-shadow: 0 0 10px var(--emile-green-neon), 0 0 20px var(--emile-green-neon);
+}
+
+/* Header EMILE avec effet glass dark */
+.header-emile {
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--emile-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Divider rouge néon */
+.divider-emile {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--emile-red-neon) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px rgba(255, 0, 51, 0.4);
+}
+
+/* Mobile app container - look application mobile */
+.mobile-app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .mobile-app-container {
+    max-width: 600px;
+  }
+}
+
+/* Animation pulse rouge #FF3B38 */
+@keyframes emilePulseRed {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 59, 56, 0.4), 0 0 40px rgba(255, 59, 56, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 59, 56, 0.6), 0 0 60px rgba(255, 59, 56, 0.3);
+  }
+}
+
+.animate-pulse-red {
+  animation: emilePulseRed 2s ease-in-out infinite;
+}
+
+/* Animation pulse vert #14D969 */
+@keyframes emilePulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(20, 217, 105, 0.4), 0 0 40px rgba(20, 217, 105, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(20, 217, 105, 0.6), 0 0 60px rgba(20, 217, 105, 0.3);
+  }
+}
+
+.animate-pulse-green {
+  animation: emilePulseGreen 2s ease-in-out infinite;
+}
+
+/* Animation logo qui grandit progressivement (loading) */
+@keyframes logoZoom {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-logo-zoom {
+  animation: logoZoom 1.5s ease-out infinite;
+}
+
+/* Animation barre de progression */
+@keyframes progressBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-progress-bar {
+  animation: progressBar 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--red-primary);
 }

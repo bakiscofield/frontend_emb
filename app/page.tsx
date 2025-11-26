@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuthStore } from '@/lib/store';
 
 export default function Home() {
@@ -25,10 +26,29 @@ export default function Home() {
   }, [isAuthenticated, isAdmin, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-white mx-auto"></div>
-        <p className="text-white mt-4 text-lg">Chargement...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      {/* Logo qui grandit progressivement */}
+      <div className="animate-logo-zoom">
+        <Image
+          src="/logo.png"
+          alt="EMILE TRANSFER+"
+          width={400}
+          height={150}
+          className="w-auto h-auto max-w-[300px] md:max-w-[400px]"
+          priority
+        />
+      </div>
+
+      {/* Texte de chargement */}
+      <div className="mt-8 text-center">
+        <p className="text-gray-600 text-lg">
+          Chargement<span className="loading-dots"></span>
+        </p>
+      </div>
+
+      {/* Barre de progression avec effet néon rouge */}
+      <div className="mt-6 w-48 h-1 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-emile-red-neon to-emile-red-glow animate-progress-bar"></div>
       </div>
     </div>
   );
