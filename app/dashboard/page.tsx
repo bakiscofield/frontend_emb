@@ -756,8 +756,8 @@ export default function DashboardPage() {
             name: user.name,
             email: user.email || '',
             phone: user.phone,
-            kyc_verified: user.kyc_verified === 1,
-            kyc_status: user.kyc_status || 'pending'
+            kyc_verified: Boolean(user.kyc_verified),
+            kyc_status: (user.kyc_status as 'pending' | 'approved' | 'rejected') || 'pending'
           }}
           onProfileUpdate={handleProfileUpdate}
         />

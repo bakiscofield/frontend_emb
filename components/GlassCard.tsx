@@ -1,14 +1,16 @@
 'use client';
 
-import { motion, HTMLMotionProps } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ReactNode } from 'react';
 
-interface GlassCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
+interface GlassCardProps {
   children: ReactNode;
   className?: string;
   glow?: boolean;
   glowColor?: string;
   hover?: boolean;
+  onClick?: (e?: any) => void;
+  [key: string]: any; // Allow any additional props
 }
 
 export default function GlassCard({
