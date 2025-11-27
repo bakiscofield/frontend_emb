@@ -328,15 +328,16 @@ export default function ExchangePairsPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
             onClick={() => setIsModalOpen(false)}
           >
-            <GlassCard
-              className="w-full max-w-2xl p-4 sm:p-6 my-8"
-              glow
-              glowColor="red"
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-            >
+            <div className="w-full min-h-full sm:min-h-0 flex items-start sm:items-center justify-center pt-20 sm:pt-0 pb-8">
+              <GlassCard
+                className="w-full max-w-2xl p-4 sm:p-6 my-0 sm:my-8"
+                glow
+                glowColor="red"
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              >
               <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
                 {editingPair ? 'Modifier' : 'Créer'} une paire d'échange
               </h2>
@@ -572,11 +573,11 @@ export default function ExchangePairsPage() {
                   </NeonButton>
                 </div>
               </form>
-            </GlassCard>
+              </GlassCard>
+            </div>
           </motion.div>
         )}
       </div>
-    </div>
     </>
   );
 }
