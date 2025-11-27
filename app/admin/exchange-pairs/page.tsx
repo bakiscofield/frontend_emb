@@ -53,6 +53,7 @@ export default function ExchangePairsPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPair, setEditingPair] = useState<ExchangePair | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     from_method_id: '',
     to_method_id: '',
@@ -142,6 +143,7 @@ export default function ExchangePairsPage() {
       payment_syntax_value: '',
       fields: []
     });
+    setCurrentStep(1);
   };
 
   const handleEdit = (pair: ExchangePair) => {
@@ -198,6 +200,32 @@ export default function ExchangePairsPage() {
       ...formData,
       fields: formData.fields.filter((_, i) => i !== index)
     });
+  };
+
+  const nextStep = () => {
+    // Validation selon le step
+    if (currentStep === 1) {
+      if (!formData.from_method_id || !formData.to_method_id) {
+        toast.error('Veuillez sélectionner les moyens de paiement');
+        return;
+      }
+      if (formData.from_method_id === formData.to_method_id) {
+        toast.error('Les moyens de paiement doivent être différents');
+        return;
+      }
+    }
+    setCurrentStep(prev => Math.min(prev + 1, 4));
+  };
+
+  const prevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const canGoNext = () => {
+    if (currentStep === 1) {
+      return formData.from_method_id && formData.to_method_id;
+    }
+    return true;
   };
 
   if (!isAuthenticated || !isAdmin || !admin) {
@@ -342,7 +370,39 @@ export default function ExchangePairsPage() {
                 {editingPair ? 'Modifier' : 'Créer'} une paire d'échange
               </h2>
 
+              {/* Stepper - Mobile only */}
+              <div className="sm:hidden mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  {[1, 2, 3, 4].map((step) => (
+                    <div key={step} className="flex-1 flex items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        step === currentStep
+                          ? 'bg-cyan-500 text-white'
+                          : step < currentStep
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-700 text-gray-400'
+                      }`}>
+                        {step}
+                      </div>
+                      {step < 4 && (
+                        <div className={`flex-1 h-1 mx-1 ${
+                          step < currentStep ? 'bg-green-500' : 'bg-gray-700'
+                        }`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-center text-gray-400">
+                  {currentStep === 1 && 'Sélection des paires'}
+                  {currentStep === 2 && 'Frais et taxes'}
+                  {currentStep === 3 && 'Syntaxe de paiement'}
+                  {currentStep === 4 && 'Champs personnalisés'}
+                </p>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                {/* Step 1: Sélection des paires */}
+                <div className={`${currentStep !== 1 ? 'hidden sm:block' : ''}`}>
                 {!editingPair && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
@@ -384,8 +444,10 @@ export default function ExchangePairsPage() {
                     </div>
                   </div>
                 )}
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                {/* Step 2: Frais et taxes */}
+                <div className={`${currentStep !== 2 ? 'hidden sm:block' : ''} grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4`}>
                   <AnimatedInput
                     label="Frais (%)"
                     type="number"
@@ -407,7 +469,8 @@ export default function ExchangePairsPage() {
                   />
                 </div>
 
-                {/* Syntaxe de Paiement */}
+                {/* Step 3: Syntaxe de Paiement */}
+                <div className={`${currentStep !== 3 ? 'hidden sm:block' : ''}`}>
                 <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
@@ -453,10 +516,12 @@ export default function ExchangePairsPage() {
                     )}
                   </div>
                 </div>
+                </div>
 
-                <div className="neon-divider my-4 sm:my-6" />
+                <div className="neon-divider my-4 sm:my-6 hidden sm:block" />
 
-                <div>
+                {/* Step 4: Champs personnalisés */}
+                <div className={`${currentStep !== 4 ? 'hidden sm:block' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4">
                     <h3 className="text-base sm:text-lg font-semibold text-white">
                       Champs personnalisés
@@ -558,8 +623,39 @@ export default function ExchangePairsPage() {
                     ))}
                   </div>
                 </div>
+                </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 mt-4 sm:mt-6">
+                {/* Navigation buttons - Mobile with steps */}
+                <div className="sm:hidden flex gap-3 mt-6">
+                  {currentStep > 1 && (
+                    <NeonButton
+                      type="button"
+                      variant="secondary"
+                      fullWidth
+                      onClick={prevStep}
+                    >
+                      <span className="text-sm">← Précédent</span>
+                    </NeonButton>
+                  )}
+                  {currentStep < 4 ? (
+                    <NeonButton
+                      type="button"
+                      variant="primary"
+                      fullWidth
+                      onClick={nextStep}
+                      disabled={!canGoNext()}
+                    >
+                      <span className="text-sm">Suivant →</span>
+                    </NeonButton>
+                  ) : (
+                    <NeonButton type="submit" variant="primary" fullWidth>
+                      <span className="text-sm">{editingPair ? 'Mettre à jour' : 'Créer'}</span>
+                    </NeonButton>
+                  )}
+                </div>
+
+                {/* Standard buttons - Desktop (no steps) */}
+                <div className="hidden sm:flex flex-col sm:flex-row gap-3 mt-4 sm:mt-6">
                   <NeonButton type="submit" variant="primary" fullWidth>
                     <span className="text-sm sm:text-base">{editingPair ? 'Mettre à jour' : 'Créer'}</span>
                   </NeonButton>
