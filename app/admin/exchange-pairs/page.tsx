@@ -226,7 +226,7 @@ export default function ExchangePairsPage() {
       return formData.from_method_id && formData.to_method_id;
     }
     return true;
-  };
+  }
 
   if (!isAuthenticated || !isAdmin || !admin) {
     return null;
