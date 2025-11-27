@@ -3,7 +3,7 @@
   "short_name": "EMB",
   "description": "Application d'échange de moyens de paiement mobile",
   "start_url": "/",
-  "display": "fullscreen",
+  "display": "standalone",
   "background_color": "#0a0e27",
   "theme_color": "#06b6d4",
   "orientation": "portrait",
@@ -150,7 +150,7 @@
   "edge_side_panel": {
     "preferred_width": 480
   },
-  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "display_override": ["window-controls-overlay", "standalone"],
   "categories": ["finance", "business", "productivity"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "lang": "fr",
