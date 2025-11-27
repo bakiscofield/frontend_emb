@@ -20,6 +20,8 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    acceptCGU: false,
+    acceptPrivacyPolicy: false,
   });
   const [verificationCode, setVerificationCode] = useState('');
   const [savedEmail, setSavedEmail] = useState('');
@@ -35,6 +37,16 @@ export default function RegisterPage() {
 
     if (formData.password.length < 6) {
       toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    if (!formData.acceptCGU) {
+      toast.error('Vous devez accepter les Conditions Générales d\'Utilisation');
+      return;
+    }
+
+    if (!formData.acceptPrivacyPolicy) {
+      toast.error('Vous devez accepter la Politique de Confidentialité');
       return;
     }
 
@@ -211,6 +223,53 @@ export default function RegisterPage() {
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
                 />
+              </div>
+
+              {/* CGU and Privacy Policy checkboxes */}
+              <div className="space-y-3 pt-4 border-t border-gray-700">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="acceptCGU"
+                    checked={formData.acceptCGU}
+                    onChange={(e) => setFormData({ ...formData, acceptCGU: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 focus:ring-offset-gray-900"
+                    required
+                  />
+                  <label htmlFor="acceptCGU" className="text-sm text-gray-300">
+                    J'accepte les{' '}
+                    <Link
+                      href="/cgu"
+                      target="_blank"
+                      className="text-red-500 hover:text-red-400 underline"
+                    >
+                      Conditions Générales d'Utilisation
+                    </Link>
+                    {' '}<span className="text-red-500">*</span>
+                  </label>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="acceptPrivacyPolicy"
+                    checked={formData.acceptPrivacyPolicy}
+                    onChange={(e) => setFormData({ ...formData, acceptPrivacyPolicy: e.target.checked })}
+                    className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 focus:ring-offset-gray-900"
+                    required
+                  />
+                  <label htmlFor="acceptPrivacyPolicy" className="text-sm text-gray-300">
+                    J'accepte la{' '}
+                    <Link
+                      href="/privacy-policy"
+                      target="_blank"
+                      className="text-red-500 hover:text-red-400 underline"
+                    >
+                      Politique de Confidentialité
+                    </Link>
+                    {' '}<span className="text-red-500">*</span>
+                  </label>
+                </div>
               </div>
 
               <button

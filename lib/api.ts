@@ -1,13 +1,25 @@
 import axios from 'axios';
+import { getApiUrl } from './config';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
+// Instance axios qui sera configurée dynamiquement
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Configurer l'URL de base dynamiquement
+api.interceptors.request.use(
+  (config) => {
+    // Définir baseURL dynamiquement à chaque requête
+    if (!config.baseURL) {
+      const apiUrl = getApiUrl();
+      config.baseURL = `${apiUrl}/api`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Intercepteur pour ajouter le token à chaque requête
 api.interceptors.request.use(

@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import RegisterServiceWorker from './register-sw';
 import AppLoader from '@/components/AppLoader';
+import ConfigProvider from '@/components/ConfigProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -45,7 +46,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <AppLoader />
         <RegisterServiceWorker />
-        {children}
+        <ConfigProvider>
+          {children}
+        </ConfigProvider>
         <Toaster
           position="top-center"
           toastOptions={{

@@ -1,18 +1,28 @@
 // Service Worker PWA complet - EMB
-const CACHE_VERSION = 'emb-v1.0.0';
+// Version augmentée pour éviter les rafraîchissements et améliorer le cache
+const CACHE_VERSION = 'emb-v1.1.0';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
 // Assets à précacher (essentiels pour le fonctionnement offline)
 const PRECACHE_URLS = [
   '/',
   '/offline.html',
   '/manifest.json',
+  '/config.json', // Ajouter le fichier de config
   '/logo.png',
   '/icon-192x192.png',
   '/icon-512x512.png',
 ];
+
+// Durées de cache (en secondes)
+const CACHE_DURATION = {
+  short: 5 * 60,       // 5 minutes - pour les données dynamiques
+  medium: 30 * 60,     // 30 minutes - pour les pages HTML
+  long: 24 * 60 * 60,  // 24 heures - pour les assets statiques
+};
 
 // ==================== INSTALLATION ====================
 self.addEventListener('install', (event) => {
@@ -22,9 +32,16 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE)
       .then((cache) => {
         console.log('[SW] Précaching des assets essentiels');
-        return cache.addAll(PRECACHE_URLS);
+        return cache.addAll(PRECACHE_URLS).catch((error) => {
+          console.error('[SW] Erreur précache:', error);
+          // Continuer même en cas d'erreur pour ne pas bloquer l'installation
+        });
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[SW] Installation terminée - En attente d\'activation');
+        // Ne pas forcer skipWaiting() - laisser l'utilisateur contrôler la mise à jour
+        // self.skipWaiting();
+      })
   );
 });
 
@@ -59,19 +76,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stratégie pour les requêtes API
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstStrategy(request, API_CACHE));
+  // Ne pas cacher config.json - toujours récupérer la version fraîche
+  if (url.pathname === '/config.json') {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' }).catch(() => caches.match(request))
+    );
     return;
   }
 
-  // Stratégie pour les images
+  // Stratégie pour les requêtes API - Network First avec timeout court
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(networkFirstWithTimeoutStrategy(request, API_CACHE, 3000));
+    return;
+  }
+
+  // Stratégie pour les images - Cache First
   if (request.destination === 'image') {
     event.respondWith(cacheFirstStrategy(request, DYNAMIC_CACHE));
     return;
   }
 
-  // Stratégie pour les assets statiques (JS, CSS, fonts)
+  // Stratégie pour les assets statiques (JS, CSS, fonts) - Cache First
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
@@ -81,8 +106,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stratégie par défaut pour les pages HTML
-  event.respondWith(networkFirstStrategy(request, DYNAMIC_CACHE));
+  // Stratégie OPTIMALE pour les pages HTML - Stale-While-Revalidate
+  // Sert immédiatement du cache tout en mettant à jour en arrière-plan
+  // ÉVITE LES RAFRAÎCHISSEMENTS !
+  if (request.destination === 'document' || request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(staleWhileRevalidateStrategy(request, RUNTIME_CACHE));
+    return;
+  }
+
+  // Par défaut - Stale-While-Revalidate
+  event.respondWith(staleWhileRevalidateStrategy(request, RUNTIME_CACHE));
 });
 
 // ==================== STRATÉGIES DE CACHE ====================
@@ -135,6 +168,66 @@ async function cacheFirstStrategy(request, cacheName) {
     return response;
   } catch (error) {
     console.error('[SW] Erreur fetch:', error);
+    throw error;
+  }
+}
+
+// Stale-While-Revalidate: Retourne le cache immédiatement et met à jour en arrière-plan
+// MEILLEURE STRATÉGIE POUR ÉVITER LES RAFRAÎCHISSEMENTS
+async function staleWhileRevalidateStrategy(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await caches.match(request);
+
+  // Promesse de mise à jour en arrière-plan
+  const fetchPromise = fetch(request).then((response) => {
+    // Mettre à jour le cache en arrière-plan uniquement si succès
+    if (response.status === 200) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  }).catch((error) => {
+    console.error('[SW] Erreur fetch background:', error);
+    return null;
+  });
+
+  // Retourner immédiatement le cache s'il existe, sinon attendre le réseau
+  return cachedResponse || fetchPromise || caches.match('/offline.html');
+}
+
+// Network First avec timeout: Essaie le réseau avec un timeout, puis le cache
+async function networkFirstWithTimeoutStrategy(request, cacheName, timeout = 3000) {
+  try {
+    // Créer une promesse avec timeout
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), timeout)
+    );
+
+    const fetchPromise = fetch(request);
+
+    // Course entre fetch et timeout
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+    // Mettre en cache seulement les réponses valides
+    if (response.status === 200) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch (error) {
+    // Si timeout ou erreur réseau, chercher dans le cache
+    const cachedResponse = await caches.match(request);
+
+    if (cachedResponse) {
+      console.log('[SW] Utilisation du cache suite à timeout/erreur');
+      return cachedResponse;
+    }
+
+    // Fallback vers la page offline pour les documents
+    if (request.destination === 'document') {
+      return caches.match('/offline.html');
+    }
+
     throw error;
   }
 }
