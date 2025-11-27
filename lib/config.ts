@@ -18,8 +18,19 @@ export async function loadConfig(): Promise<AppConfig> {
     return cachedConfig;
   }
 
+  // En développement, utiliser directement la variable d'environnement
+  if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_API_URL?.includes('localhost')) {
+    cachedConfig = {
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+      version: '1.0.0',
+      appName: 'EMB Transfer'
+    };
+    console.log('[Config] Mode développement - API URL:', cachedConfig.apiUrl);
+    return cachedConfig;
+  }
+
   try {
-    // Charger la configuration depuis le fichier public
+    // En production, charger la configuration depuis le fichier public
     const response = await fetch('/config.json', {
       cache: 'no-store', // Ne pas cacher ce fichier
       headers: {
@@ -32,6 +43,7 @@ export async function loadConfig(): Promise<AppConfig> {
     }
 
     cachedConfig = await response.json();
+    console.log('[Config] Mode production - API URL:', cachedConfig.apiUrl);
     return cachedConfig;
   } catch (error) {
     console.error('Erreur lors du chargement de la configuration:', error);
