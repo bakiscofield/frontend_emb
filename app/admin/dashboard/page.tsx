@@ -64,7 +64,6 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [validationComment, setValidationComment] = useState('');
-  const [percentage, setPercentage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [pdfTransaction, setPdfTransaction] = useState<Transaction | null>(null);
@@ -88,9 +87,6 @@ export default function AdminDashboard() {
       if (activeTab === 'stats') {
         const statsRes = await transactionsAPI.getStats();
         setStats(statsRes.data.stats);
-      } else if (activeTab === 'settings') {
-        const configRes = await settingsAPI.getPublicConfig('commission_percentage');
-        setPercentage(configRes.data.config.value);
       } else {
         const transRes = await transactionsAPI.getAllTransactions({ status: activeTab, limit: 100 });
         setTransactions(transRes.data.transactions);
@@ -114,18 +110,6 @@ export default function AdminDashboard() {
       loadData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur lors de la validation');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdatePercentage = async () => {
-    setLoading(true);
-    try {
-      await settingsAPI.updateConfig('commission_percentage', percentage);
-      toast.success('Pourcentage mis à jour avec succès');
-    } catch (error: any) {
-      toast.error('Erreur lors de la mise à jour');
     } finally {
       setLoading(false);
     }
@@ -341,33 +325,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Paramètres de commission */}
-            <div className="max-w-2xl">
-              <div className="card-emile">
-                <h2 className="text-xl font-bold text-white mb-6">Paramètres de commission</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="form-label text-white">Pourcentage de commission (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      className="input-emile"
-                      value={percentage}
-                      onChange={(e) => setPercentage(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    onClick={handleUpdatePercentage}
-                    className="btn-emile-success"
-                    disabled={loading}
-                  >
-                    {loading ? 'Enregistrement...' : 'Enregistrer'}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         ) : (
           <div>

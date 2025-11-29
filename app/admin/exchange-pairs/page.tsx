@@ -40,6 +40,8 @@ interface ExchangePair {
   to_method_icon: string;
   fee_percentage: number;
   tax_amount: number;
+  min_amount: number;
+  max_amount: number;
   payment_syntax_type: 'TEXTE' | 'LIEN' | 'AUTRE';
   payment_syntax_value: string;
   is_active: boolean;
@@ -59,6 +61,8 @@ export default function ExchangePairsPage() {
     to_method_id: '',
     fee_percentage: '0',
     tax_amount: '0',
+    min_amount: '500',
+    max_amount: '500000',
     payment_syntax_type: 'TEXTE' as 'TEXTE' | 'LIEN' | 'AUTRE',
     payment_syntax_value: '',
     fields: [] as Field[]
@@ -105,6 +109,8 @@ export default function ExchangePairsPage() {
         to_method_id: parseInt(formData.to_method_id),
         fee_percentage: parseFloat(formData.fee_percentage),
         tax_amount: parseFloat(formData.tax_amount),
+        min_amount: parseFloat(formData.min_amount),
+        max_amount: parseFloat(formData.max_amount),
         payment_syntax_type: formData.payment_syntax_type,
         payment_syntax_value: formData.payment_syntax_value,
         fields: formData.fields
@@ -114,6 +120,8 @@ export default function ExchangePairsPage() {
         await exchangePairsAPI.update(editingPair.id.toString(), {
           fee_percentage: data.fee_percentage,
           tax_amount: data.tax_amount,
+          min_amount: data.min_amount,
+          max_amount: data.max_amount,
           payment_syntax_type: data.payment_syntax_type,
           payment_syntax_value: data.payment_syntax_value,
           fields: data.fields
@@ -139,6 +147,8 @@ export default function ExchangePairsPage() {
       to_method_id: '',
       fee_percentage: '0',
       tax_amount: '0',
+      min_amount: '500',
+      max_amount: '500000',
       payment_syntax_type: 'TEXTE',
       payment_syntax_value: '',
       fields: []
@@ -153,6 +163,8 @@ export default function ExchangePairsPage() {
       to_method_id: pair.to_method_id.toString(),
       fee_percentage: pair.fee_percentage.toString(),
       tax_amount: pair.tax_amount.toString(),
+      min_amount: pair.min_amount?.toString() || '500',
+      max_amount: pair.max_amount?.toString() || '500000',
       payment_syntax_type: pair.payment_syntax_type || 'TEXTE',
       payment_syntax_value: pair.payment_syntax_value || '',
       fields: pair.fields || []
@@ -226,7 +238,7 @@ export default function ExchangePairsPage() {
       return formData.from_method_id && formData.to_method_id;
     }
     return true;
-  }
+  };
 
   if (!isAuthenticated || !isAdmin || !admin) {
     return null;
@@ -306,7 +318,7 @@ export default function ExchangePairsPage() {
 
               <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
                 <div className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-gray-400">Frais:</span>
+                  <span className="text-gray-400">Commission:</span>
                   <span className="text-emile-green font-semibold">
                     {pair.fee_percentage}%
                   </span>
@@ -319,6 +331,12 @@ export default function ExchangePairsPage() {
                     </span>
                   </div>
                 )}
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-gray-400">Montants:</span>
+                  <span className="text-emile-blue font-semibold">
+                    {pair.min_amount || 500} - {pair.max_amount || 500000} FCFA
+                  </span>
+                </div>
                 {pair.fields && pair.fields.length > 0 && (
                   <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-gray-400">Champs:</span>
@@ -350,6 +368,7 @@ export default function ExchangePairsPage() {
             </GlassCard>
           ))}
         </div>
+        </div>
 
         {/* Modal */}
         {isModalOpen && (
@@ -359,7 +378,7 @@ export default function ExchangePairsPage() {
             className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center p-0 sm:p-4 z-50 overflow-y-auto"
             onClick={() => setIsModalOpen(false)}
           >
-            <div className="w-full min-h-full sm:min-h-0 flex items-start sm:items-center justify-center pt-20 sm:pt-0 pb-8">
+            <div className="w-full min-h-full sm:min-h-0 flex items-start sm:items-center justify-center pt-40 sm:pt-0 pb-8">
               <GlassCard
                 className="w-full max-w-2xl p-4 sm:p-6 my-0 sm:my-8"
                 glow
@@ -394,7 +413,7 @@ export default function ExchangePairsPage() {
                 </div>
                 <p className="text-xs text-center text-gray-400">
                   {currentStep === 1 && 'Sélection des paires'}
-                  {currentStep === 2 && 'Frais et taxes'}
+                  {currentStep === 2 && 'Commission, taxes et montants'}
                   {currentStep === 3 && 'Syntaxe de paiement'}
                   {currentStep === 4 && 'Champs personnalisés'}
                 </p>
@@ -415,9 +434,9 @@ export default function ExchangePairsPage() {
                         className="form-input text-sm sm:text-base"
                         required
                       >
-                        <option value="">Sélectionner...</option>
+                        <option value="" className="bg-gray-900 text-white">Sélectionner...</option>
                         {methods.map((m) => (
-                          <option key={m.id} value={m.id}>
+                          <option key={m.id} value={m.id} className="bg-gray-900 text-white">
                             {m.icon} {m.name}
                           </option>
                         ))}
@@ -434,9 +453,9 @@ export default function ExchangePairsPage() {
                         className="form-input text-sm sm:text-base"
                         required
                       >
-                        <option value="">Sélectionner...</option>
+                        <option value="" className="bg-gray-900 text-white">Sélectionner...</option>
                         {methods.map((m) => (
-                          <option key={m.id} value={m.id}>
+                          <option key={m.id} value={m.id} className="bg-gray-900 text-white">
                             {m.icon} {m.name}
                           </option>
                         ))}
@@ -446,27 +465,53 @@ export default function ExchangePairsPage() {
                 )}
                 </div>
 
-                {/* Step 2: Frais et taxes */}
-                <div className={`${currentStep !== 2 ? 'hidden sm:block' : ''} grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4`}>
-                  <AnimatedInput
-                    label="Frais (%)"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    placeholder="Ex: 2.5"
-                    value={formData.fee_percentage}
-                    onChange={(e) => setFormData({ ...formData, fee_percentage: e.target.value })}
-                  />
+                {/* Step 2: Frais, taxes et montants */}
+                <div className={`${currentStep !== 2 ? 'hidden sm:block' : ''} space-y-4`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <AnimatedInput
+                      label="Pourcentage de commission (%)"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="Ex: 2.5"
+                      value={formData.fee_percentage}
+                      onChange={(e) => setFormData({ ...formData, fee_percentage: e.target.value })}
+                    />
 
-                  <AnimatedInput
-                    label="Taxe (FCFA)"
-                    type="number"
-                    step="1"
-                    min="0"
-                    placeholder="Ex: 100"
-                    value={formData.tax_amount}
-                    onChange={(e) => setFormData({ ...formData, tax_amount: e.target.value })}
-                  />
+                    <AnimatedInput
+                      label="Taxe (FCFA)"
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="Ex: 100"
+                      value={formData.tax_amount}
+                      onChange={(e) => setFormData({ ...formData, tax_amount: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <AnimatedInput
+                      label="Montant minimum (FCFA)"
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="Ex: 500"
+                      value={formData.min_amount}
+                      onChange={(e) => setFormData({ ...formData, min_amount: e.target.value })}
+                      required
+                    />
+
+                    <AnimatedInput
+                      label="Montant maximum (FCFA)"
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="Ex: 500000"
+                      value={formData.max_amount}
+                      onChange={(e) => setFormData({ ...formData, max_amount: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* Step 3: Syntaxe de Paiement */}
@@ -481,9 +526,9 @@ export default function ExchangePairsPage() {
                       onChange={(e) => setFormData({ ...formData, payment_syntax_type: e.target.value as 'TEXTE' | 'LIEN' | 'AUTRE' })}
                       className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:border-emile-red focus:outline-none text-sm sm:text-base"
                     >
-                      <option value="TEXTE">Texte (avec variable {'{montant}'})</option>
-                      <option value="LIEN">Lien URL</option>
-                      <option value="AUTRE">Autre</option>
+                      <option value="TEXTE" className="bg-gray-900 text-white">Texte (avec variable {'{montant}'})</option>
+                      <option value="LIEN" className="bg-gray-900 text-white">Lien URL</option>
+                      <option value="AUTRE" className="bg-gray-900 text-white">Autre</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
                       Le type détermine comment les instructions de paiement seront affichées au client
@@ -571,10 +616,10 @@ export default function ExchangePairsPage() {
                               onChange={(e) => updateField(index, { field_type: e.target.value })}
                               className="form-input text-sm sm:text-base"
                             >
-                              <option value="text">Texte</option>
-                              <option value="url">URL/Lien</option>
-                              <option value="file">Fichier</option>
-                              <option value="select">Sélection</option>
+                              <option value="text" className="bg-gray-900 text-white">Texte</option>
+                              <option value="url" className="bg-gray-900 text-white">URL/Lien</option>
+                              <option value="file" className="bg-gray-900 text-white">Fichier</option>
+                              <option value="select" className="bg-gray-900 text-white">Sélection</option>
                             </select>
                           </div>
 
@@ -622,7 +667,6 @@ export default function ExchangePairsPage() {
                       </GlassCard>
                     ))}
                   </div>
-                </div>
                 </div>
 
                 {/* Navigation buttons - Mobile with steps */}

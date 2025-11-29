@@ -25,6 +25,8 @@ interface ExchangePair {
   to_method_icon: string;
   fee_percentage: number;
   tax_amount: number;
+  min_amount: number;
+  max_amount: number;
   payment_syntax_type: 'TEXTE' | 'LIEN' | 'AUTRE';
   payment_syntax_value: string;
   fields: Field[];
@@ -189,8 +191,12 @@ export default function DashboardPage() {
     e.preventDefault();
 
     const amount = parseFloat(formData.amount);
-    if (amount < minAmount || amount > maxAmount) {
-      toast.error(`Le montant doit être entre ${minAmount} et ${maxAmount} FCFA`);
+    // Utiliser les montants de la paire sélectionnée ou les valeurs par défaut
+    const currentMinAmount = selectedPair?.min_amount || minAmount;
+    const currentMaxAmount = selectedPair?.max_amount || maxAmount;
+
+    if (amount < currentMinAmount || amount > currentMaxAmount) {
+      toast.error(`Le montant doit être entre ${currentMinAmount} et ${currentMaxAmount} FCFA`);
       return;
     }
 
@@ -227,14 +233,18 @@ export default function DashboardPage() {
         toMethod: selectedPair?.to_method_name || ''
       });
 
-      // Afficher le modal de succès
-      setShowSuccessModal(true);
-
-      // Pour les liens, informer que le lien sera envoyé après validation
-      if (selectedPair?.payment_syntax_type === 'LIEN') {
-        toast.success('Le lien de paiement vous sera envoyé après validation de votre demande', {
-          duration: 5000
+      // Pour les liens, afficher d'abord le modal avec le lien, puis le modal de succès
+      if (selectedPair?.payment_syntax_type === 'LIEN' && selectedPair?.payment_syntax_value) {
+        setPaymentInfo({
+          syntaxType: 'LIEN',
+          syntaxValue: selectedPair.payment_syntax_value,
+          totalAmount: calculateTotal()
         });
+        setShowPaymentModal(true);
+        // Le modal de succès sera affiché quand l'utilisateur ferme le modal de paiement
+      } else {
+        // Afficher le modal de succès directement pour les autres types
+        setShowSuccessModal(true);
       }
 
       setSelectedPair(null);
@@ -381,13 +391,16 @@ export default function DashboardPage() {
 
                     <div className="space-y-1 sm:space-y-2 text-center">
                       <div className="text-xs sm:text-sm text-gray-300">
-                        Frais: <span className="text-emile-red font-bold">{pair.fee_percentage}%</span>
+                        Commission: <span className="text-emile-red font-bold">{pair.fee_percentage}%</span>
                       </div>
                       {pair.tax_amount > 0 && (
                         <div className="text-xs sm:text-sm text-gray-300">
                           Taxe: <span className="text-emile-red font-bold">{pair.tax_amount} FCFA</span>
                         </div>
                       )}
+                      <div className="text-xs sm:text-sm text-gray-300">
+                        Montants: <span className="text-emile-green font-bold">{pair.min_amount || 500} - {pair.max_amount || 500000} FCFA</span>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -464,9 +477,9 @@ export default function DashboardPage() {
                         label="Montant"
                         type="number"
                         step="1"
-                        min={minAmount}
-                        max={maxAmount}
-                        placeholder={`Entre ${minAmount} et ${maxAmount} FCFA`}
+                        min={selectedPair?.min_amount || minAmount}
+                        max={selectedPair?.max_amount || maxAmount}
+                        placeholder={`Entre ${selectedPair?.min_amount || minAmount} et ${selectedPair?.max_amount || maxAmount} FCFA`}
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                         required
@@ -589,12 +602,68 @@ export default function DashboardPage() {
                         </div>
                       )}
 
-                      {/* Message pour les liens */}
-                      {selectedPair.payment_syntax_type === 'LIEN' && (
-                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                          <p className="text-sm text-blue-400">
-                            ℹ️ Le lien de paiement vous sera envoyé par email après validation de votre demande par un administrateur.
-                          </p>
+                      {/* Lien de paiement cliquable */}
+                      {paymentInfo.syntaxType === 'LIEN' && paymentInfo.syntaxValue && (
+                        <div className="bg-gray-900/50 border-2 border-blue-500/30 rounded-xl p-4 sm:p-6 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 sm:p-3 bg-blue-500/20 rounded-lg">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-lg sm:text-xl font-bold text-white">Lien de Paiement</h3>
+                                <p className="text-gray-400 text-xs sm:text-sm">Cliquez pour effectuer le paiement</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(paymentInfo.syntaxValue);
+                                  toast.success('Lien copié!');
+                                } catch (error) {
+                                  toast.error('Erreur lors de la copie');
+                                }
+                              }}
+                              className="p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
+                              title="Copier le lien"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          <a
+                            href={paymentInfo.syntaxValue}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group block"
+                          >
+                            <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-3 sm:p-4 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition-all">
+                              <div className="flex items-center justify-between gap-2 sm:gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-white font-semibold mb-1 text-sm sm:text-base">Ouvrir le lien de paiement</div>
+                                  <div className="text-blue-100 text-xs sm:text-sm truncate">{paymentInfo.syntaxValue}</div>
+                                </div>
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:translate-x-1 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </div>
+                            </div>
+                          </a>
+
+                          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 sm:p-4">
+                            <p className="text-yellow-400 text-xs sm:text-sm">
+                              <span className="font-semibold">Montant à payer:</span> <span className="font-bold text-base sm:text-lg">{paymentInfo.totalAmount} FCFA</span>
+                            </p>
+                          </div>
+
+                          <div className="text-gray-400 text-xs sm:text-sm">
+                            Le lien s'ouvrira dans un nouvel onglet. Une fois le paiement effectué, votre transaction sera automatiquement validée par un administrateur.
+                          </div>
                         </div>
                       )}
 
@@ -723,6 +792,10 @@ export default function DashboardPage() {
             setShowPaymentModal(false);
             setPaymentInfo(null);
             setHasViewedSyntax(true); // Marquer comme vu quand l'utilisateur ferme la modale
+            // Si on a des données de transaction (transaction créée), afficher le modal de succès
+            if (successTransactionData) {
+              setShowSuccessModal(true);
+            }
           }}
           syntaxType={paymentInfo.syntaxType}
           syntaxValue={paymentInfo.syntaxValue}
