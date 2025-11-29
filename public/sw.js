@@ -1,6 +1,7 @@
 // Service Worker PWA complet - EMB
 // Version augmentée pour éviter les rafraîchissements et améliorer le cache
-const CACHE_VERSION = 'emb-v1.1.0';
+// Service Worker TOUJOURS ACTIF avec gestion automatique
+const CACHE_VERSION = 'emb-v1.2.0';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
@@ -38,9 +39,9 @@ self.addEventListener('install', (event) => {
         });
       })
       .then(() => {
-        console.log('[SW] Installation terminée - En attente d\'activation');
-        // Ne pas forcer skipWaiting() - laisser l'utilisateur contrôler la mise à jour
-        // self.skipWaiting();
+        console.log('[SW] Installation terminée - Activation automatique');
+        // Forcer l'activation immédiate du nouveau service worker
+        return self.skipWaiting();
       })
   );
 });
@@ -55,14 +56,28 @@ self.addEventListener('activate', (event) => {
         // Supprimer les anciens caches
         return Promise.all(
           cacheNames
-            .filter((name) => name.startsWith('emb-') && name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== API_CACHE)
+            .filter((name) => name.startsWith('emb-') && name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== API_CACHE && name !== RUNTIME_CACHE)
             .map((name) => {
               console.log('[SW] Suppression ancien cache:', name);
               return caches.delete(name);
             })
         );
       })
-      .then(() => self.clients.claim())
+      .then(() => {
+        console.log('[SW] Service Worker activé et prend le contrôle de toutes les pages');
+        return self.clients.claim();
+      })
+      .then(() => {
+        // Notifier tous les clients que le SW est actif
+        return self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({
+              type: 'SW_ACTIVATED',
+              version: CACHE_VERSION
+            });
+          });
+        });
+      })
   );
 });
 
@@ -327,6 +342,31 @@ async function syncTransactions() {
   }
 }
 
+// ==================== PERIODIC BACKGROUND SYNC ====================
+self.addEventListener('periodicsync', (event) => {
+  console.log('[SW] Periodic sync:', event.tag);
+
+  if (event.tag === 'content-sync') {
+    event.waitUntil(periodicContentSync());
+  }
+});
+
+async function periodicContentSync() {
+  try {
+    console.log('[SW] Synchronisation périodique du contenu...');
+    // Cette fonction s'exécute périodiquement pour maintenir le SW actif
+    // et synchroniser les données en arrière-plan
+
+    // Vérifier et mettre à jour les caches critiques
+    const cache = await caches.open(STATIC_CACHE);
+    const cachedUrls = await cache.keys();
+
+    console.log('[SW] Contenu en cache:', cachedUrls.length, 'éléments');
+  } catch (error) {
+    console.error('[SW] Erreur sync périodique:', error);
+  }
+}
+
 // ==================== MESSAGE ====================
 self.addEventListener('message', (event) => {
   console.log('[SW] Message reçu:', event.data);
@@ -341,6 +381,15 @@ self.addEventListener('message', (event) => {
         return Promise.all(
           cacheNames.map((name) => caches.delete(name))
         );
+      })
+    );
+  }
+
+  if (event.data && event.data.type === 'CHECK_UPDATE') {
+    // Forcer la vérification de mise à jour
+    event.waitUntil(
+      self.registration.update().then(() => {
+        console.log('[SW] Vérification de mise à jour effectuée');
       })
     );
   }

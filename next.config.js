@@ -1,17 +1,21 @@
 const withPWA = require('next-pwa')({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
-  register: true,
+  disable: false, // Service Worker TOUJOURS actif (dev + prod)
+  register: false, // Désactiver l'enregistrement auto - on utilise notre register-sw.tsx
   skipWaiting: true,
-  sw: 'sw.js',
+  sw: 'sw.js', // Utiliser notre service worker personnalisé
   scope: '/',
   reloadOnOnline: true,
+  swSrc: 'public/sw.js', // Source de notre SW personnalisé
   fallbacks: {
-    document: '/offline',
+    document: '/offline.html',
   },
   // Configuration personnalisée du service worker
-  buildExcludes: [/middleware-manifest\.json$/],
+  buildExcludes: [/middleware-manifest\.json$/, /sw\.js$/, /sw\.js\.map$/],
   publicExcludes: ['!robots.txt', '!sitemap.xml'],
+  cacheOnFrontEndNav: true,
+  cacheStartUrl: true,
+  dynamicStartUrl: false,
   // Activer le mode runtimeCaching pour un meilleur contrôle
   runtimeCaching: [
     {
