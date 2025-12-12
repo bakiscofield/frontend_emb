@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { getApiUrl } from './config';
 
+const API_URL = getApiUrl();
+
 // Instance axios qui sera configurée dynamiquement
 const api = axios.create({
   headers: {
@@ -99,6 +101,7 @@ export const transactionsAPI = {
   getAllTransactions: (params?: any) => api.get('/transactions', { params }),
   validateTransaction: (id: string, data: any) => api.put(`/transactions/${id}/validate`, data),
   getStats: () => api.get('/transactions/stats/overview'),
+  checkReference: (reference: string) => api.get(`/transactions/check-reference/${reference}`),
 };
 
 // Settings

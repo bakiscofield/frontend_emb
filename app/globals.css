@@ -184,6 +184,17 @@ body::before {
   }
 }
 
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 @keyframes slideInFromLeft {
   from {
     transform: translateX(-50px);
@@ -246,6 +257,10 @@ body::before {
 
 .animate-slide-in {
   animation: slideIn 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
 }
 
 .animate-slide-in-left {

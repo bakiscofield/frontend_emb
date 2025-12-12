@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, Camera, Shield, CheckCircle, Clock, XCircle, Upload, Edit2 } from 'lucide-react';
+import { X, User, Mail, Phone, Camera, Shield, CheckCircle, Clock, XCircle, Upload, Edit2, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { usersAPI, kycAPI } from '@/lib/api';
+import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import VerifiedBadge from './VerifiedBadge';
 
 interface ProfileModalProps {
@@ -22,9 +23,19 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }: ProfileModalProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'kyc'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'kyc' | 'notifications'>('profile');
   const [loading, setLoading] = useState(false);
   const [kycLoading, setKycLoading] = useState(false);
+
+  // Hook pour les notifications push
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    permission: pushPermission,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush
+  } = usePushNotifications();
 
   const [profileData, setProfileData] = useState({
     name: user.name,
@@ -227,7 +238,21 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
               }`}
             >
               <Shield className="w-4 h-4 inline mr-2" />
-              Verification KYC
+              KYC
+            </button>
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === 'notifications'
+                  ? 'text-red-500 border-b-2 border-red-500 bg-red-500/5'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Bell className="w-4 h-4 inline mr-2" />
+              Notifications
+              {!pushSubscribed && pushSupported && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
           </div>
 
@@ -429,6 +454,147 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
                     </button>
                   </form>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'notifications' && (
+              <div className="space-y-6">
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    Notifications Push
+                  </h3>
+
+                  {!pushSupported && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                      <p className="text-sm text-red-400">
+                        Les notifications push ne sont pas supportées par votre navigateur.
+                      </p>
+                    </div>
+                  )}
+
+                  {pushSupported && (
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3 p-4 bg-gray-900/50 rounded-lg">
+                        <Bell className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-300 leading-relaxed">
+                            Recevez des notifications en temps réel sur vos transactions : validations, rejets, et mises à jour importantes.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-gray-900/30 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-white">Statut</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {pushSubscribed ? 'Activées' : 'Désactivées'}
+                            </p>
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            pushSubscribed
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              : 'bg-gray-700 text-gray-400 border border-gray-600'
+                          }`}>
+                            {pushSubscribed ? '✓ Actif' : '○ Inactif'}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-gray-900/30 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-white">Permission</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {pushPermission === 'granted' ? 'Accordée' :
+                               pushPermission === 'denied' ? 'Refusée' :
+                               'Non demandée'}
+                            </p>
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            pushPermission === 'granted'
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              : pushPermission === 'denied'
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                          }`}>
+                            {pushPermission === 'granted' ? '✓' :
+                             pushPermission === 'denied' ? '✗' :
+                             '?'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {pushPermission === 'denied' && (
+                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                          <p className="text-sm text-yellow-400">
+                            <strong>Permission refusée</strong><br />
+                            Pour activer les notifications, vous devez autoriser les notifications dans les paramètres de votre navigateur.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        {!pushSubscribed ? (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await subscribePush();
+                                toast.success('Notifications push activées avec succès !');
+                              } catch (error: any) {
+                                toast.error(error.message || 'Erreur lors de l\'activation des notifications');
+                              }
+                            }}
+                            disabled={pushLoading || pushPermission === 'denied'}
+                            className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {pushLoading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Activation...
+                              </>
+                            ) : (
+                              <>
+                                <Bell className="w-4 h-4" />
+                                Activer les notifications
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await unsubscribePush();
+                                toast.success('Notifications push désactivées');
+                              } catch (error: any) {
+                                toast.error(error.message || 'Erreur lors de la désactivation');
+                              }
+                            }}
+                            disabled={pushLoading}
+                            className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {pushLoading ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Désactivation...
+                              </>
+                            ) : (
+                              <>
+                                <Bell className="w-4 h-4" />
+                                Désactiver les notifications
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-400">
+                          <strong>💡 Astuce :</strong> Les notifications push vous permettent de rester informé même quand vous n'êtes pas sur l'application. Vous recevrez une notification sur votre appareil dès qu'une action est effectuée sur votre compte.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

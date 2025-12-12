@@ -5,6 +5,20 @@ import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+// Helper function to get token from localStorage
+const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storage = localStorage.getItem('emb-auth-storage');
+    if (!storage) return null;
+    const parsed = JSON.parse(storage);
+    return parsed?.state?.token || null;
+  } catch (error) {
+    console.error('[Push] Error getting auth token:', error);
+    return null;
+  }
+};
+
 interface PushNotificationState {
   isSupported: boolean;
   isSubscribed: boolean;
@@ -88,27 +102,67 @@ export function usePushNotifications() {
       }
 
       // Récupérer la clé publique VAPID
-      const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+      const token = getAuthToken();
       if (!token) {
         throw new Error('Non authentifié');
       }
 
-      const { data } = await axios.get(`${API_URL}/push/vapid-public-key`, {
+      console.log('[Push] Récupération de la clé VAPID...');
+      const { data } = await axios.get(`${API_URL}/api/push/vapid-public-key`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       const publicKey = data.publicKey;
+      console.log('[Push] Clé VAPID reçue');
 
-      // S'abonner aux push notifications
+      // Vérifier que le service worker est bien enregistré et actif
+      console.log('[Push] Attente du service worker...');
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+      console.log('[Push] Service worker prêt:', registration.active?.state);
+
+      // Vérifier s'il n'y a pas déjà une souscription existante
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        console.log('[Push] Souscription existante trouvée, désabonnement...');
+        await existingSubscription.unsubscribe();
+      }
+
+      // Attendre un court instant pour s'assurer que le service worker est complètement actif
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // S'abonner aux push notifications avec gestion d'erreur améliorée
+      console.log('[Push] Création de la souscription push...');
+      let subscription: PushSubscription;
+      try {
+        const applicationServerKey = urlBase64ToUint8Array(publicKey);
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as BufferSource,
+        });
+        console.log('[Push] Souscription créée avec succès');
+      } catch (subError: any) {
+        console.error('[Push] Erreur détaillée lors de la souscription:', {
+          name: subError.name,
+          message: subError.message,
+          code: subError.code,
+          stack: subError.stack
+        });
+
+        // Erreurs spécifiques et solutions
+        if (subError.name === 'AbortError') {
+          throw new Error('Erreur de connexion au service push. Vérifiez votre connexion internet ou réessayez plus tard.');
+        } else if (subError.name === 'NotAllowedError') {
+          throw new Error('Permission refusée pour les notifications');
+        } else if (subError.name === 'NotSupportedError') {
+          throw new Error('Les notifications push ne sont pas supportées');
+        }
+        throw subError;
+      }
 
       // Enregistrer l'abonnement sur le serveur
+      console.log('[Push] Enregistrement de la souscription sur le serveur...');
       await axios.post(
-        `${API_URL}/push/subscribe`,
+        `${API_URL}/api/push/subscribe`,
         subscription.toJSON(),
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -122,7 +176,7 @@ export function usePushNotifications() {
       }));
 
       console.log('[Push] Abonnement réussi');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Push] Erreur lors de l\'abonnement:', error);
       setState(prev => ({ ...prev, isLoading: false }));
       throw error;
@@ -147,10 +201,10 @@ export function usePushNotifications() {
         await subscription.unsubscribe();
 
         // Supprimer l'abonnement du serveur
-        const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+        const token = getAuthToken();
         if (token) {
           await axios.post(
-            `${API_URL}/push/unsubscribe`,
+            `${API_URL}/api/push/unsubscribe`,
             { endpoint },
             {
               headers: { Authorization: `Bearer ${token}` }
@@ -175,13 +229,13 @@ export function usePushNotifications() {
 
   const sendTestNotification = useCallback(async () => {
     try {
-      const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+      const token = getAuthToken();
       if (!token) {
         throw new Error('Non authentifié');
       }
 
       await axios.post(
-        `${API_URL}/push/test`,
+        `${API_URL}/api/push/test`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` }

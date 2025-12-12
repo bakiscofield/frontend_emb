@@ -194,7 +194,7 @@ const TransactionReceipt = forwardRef<HTMLDivElement, TransactionReceiptProps>(
                 <div className="text-xl font-bold">{transaction.amount.toFixed(0)} FCFA</div>
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">Commission ({transaction.percentage}%)</div>
+                <div className="text-xs text-gray-400 mb-1">Frais ({transaction.percentage}%)</div>
                 <div className="text-xl font-bold text-green-400">
                   {(transaction.total_amount - transaction.amount).toFixed(0)} FCFA
                 </div>

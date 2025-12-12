@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, Check } from 'lucide-react';
+import { Bell, X, Check, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import { useAuthStore } from '@/lib/store';
 
 interface Notification {
   id: number;
@@ -24,13 +25,16 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { token } = useAuthStore();
 
   // Polling pour récupérer les notifications toutes les 10 secondes
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!token) {
+          console.log('[Notifications] Pas de token disponible');
+          return;
+        }
 
         const response = await axios.get<{ success: boolean; data: NotificationData }>(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`,
@@ -42,9 +46,10 @@ export default function NotificationBell() {
         if (response.data.success) {
           setNotifications(response.data.data.notifications);
           setUnreadCount(response.data.data.unread_count);
+          console.log('[Notifications] Récupérées:', response.data.data.notifications.length);
         }
-      } catch (error) {
-        console.error('Erreur lors de la récupération des notifications:', error);
+      } catch (error: any) {
+        console.error('[Notifications] Erreur lors de la récupération:', error.response?.data || error.message);
       }
     };
 
@@ -52,11 +57,12 @@ export default function NotificationBell() {
     const interval = setInterval(fetchNotifications, 10000); // Poll toutes les 10 secondes
 
     return () => clearInterval(interval);
-  }, []);
+  }, [token]);
 
   const markAsRead = async (id: number) => {
     try {
-      const token = localStorage.getItem('token');
+      if (!token) return;
+
       await axios.patch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${id}/read`,
         {},
@@ -70,13 +76,14 @@ export default function NotificationBell() {
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Erreur lors du marquage de la notification:', error);
+      console.error('[Notifications] Erreur lors du marquage:', error);
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token');
+      if (!token) return;
+
       await axios.patch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/read-all`,
         {},
@@ -88,7 +95,53 @@ export default function NotificationBell() {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('Erreur lors du marquage des notifications:', error);
+      console.error('[Notifications] Erreur lors du marquage de toutes:', error);
+    }
+  };
+
+  const deleteNotification = async (id: number) => {
+    try {
+      if (!token) return;
+
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      setUnreadCount(prev => {
+        const deletedNotif = notifications.find(n => n.id === id);
+        return deletedNotif && !deletedNotif.is_read ? Math.max(0, prev - 1) : prev;
+      });
+      console.log('[Notifications] Notification supprimée:', id);
+    } catch (error) {
+      console.error('[Notifications] Erreur lors de la suppression:', error);
+    }
+  };
+
+  const clearAllRead = async () => {
+    try {
+      if (!token) return;
+
+      const readNotifications = notifications.filter(n => n.is_read);
+
+      await Promise.all(
+        readNotifications.map(n =>
+          axios.delete(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications/${n.id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          )
+        )
+      );
+
+      setNotifications(prev => prev.filter(n => !n.is_read));
+      console.log('[Notifications] Toutes les notifications lues supprimées');
+    } catch (error) {
+      console.error('[Notifications] Erreur lors du nettoyage:', error);
     }
   };
 
@@ -146,32 +199,47 @@ export default function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-auto sm:mt-2 max-w-md sm:w-96 max-h-[85vh] sm:max-h-[32rem] overflow-hidden rounded-xl sm:rounded-2xl bg-gray-900/98 backdrop-blur-xl border border-white/20 shadow-2xl shadow-cyan-500/20 z-50"
+              className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-auto sm:mt-2 max-w-md sm:w-96 max-h-[85vh] sm:max-h-[32rem] overflow-hidden rounded-xl sm:rounded-2xl bg-white backdrop-blur-xl border border-gray-200 shadow-2xl z-50"
             >
               {/* Header */}
-              <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between">
-                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-red-50 to-red-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                   Notifications
                 </h3>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markAllAsRead();
-                    }}
-                    className="text-xs sm:text-sm text-cyan-400 hover:text-cyan-300 transition-colors whitespace-nowrap"
-                  >
-                    Tout lire
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAllAsRead();
+                      }}
+                      className="text-xs sm:text-sm text-red-600 hover:text-red-700 font-medium transition-colors whitespace-nowrap"
+                    >
+                      Tout lire
+                    </button>
+                  )}
+                  {notifications.some(n => n.is_read) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearAllRead();
+                      }}
+                      className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 hover:text-gray-800 font-medium transition-colors whitespace-nowrap"
+                      title="Supprimer les notifications lues"
+                    >
+                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      Nettoyer
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Notifications List */}
               <div className="max-h-[calc(85vh-60px)] sm:max-h-96 overflow-y-auto custom-scrollbar">
                 {notifications.length === 0 ? (
-                  <div className="p-6 sm:p-8 text-center text-gray-400">
-                    <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+                  <div className="p-6 sm:p-8 text-center text-gray-500">
+                    <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50 text-gray-400" />
                     <p className="text-sm sm:text-base">Aucune notification</p>
                   </div>
                 ) : (
@@ -181,9 +249,9 @@ export default function NotificationBell() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       className={`
-                        p-3 sm:p-4 border-b border-white/5 cursor-pointer
-                        transition-colors hover:bg-white/5 active:bg-white/10
-                        ${!notification.is_read ? 'bg-cyan-500/10' : ''}
+                        p-3 sm:p-4 border-b border-gray-200 cursor-pointer relative group
+                        transition-colors hover:bg-gray-50 active:bg-gray-100
+                        ${!notification.is_read ? 'bg-red-50' : 'bg-white'}
                       `}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -197,14 +265,14 @@ export default function NotificationBell() {
                         <span className="text-xl sm:text-2xl flex-shrink-0">{getNotificationIcon(notification.type)}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="text-white font-medium text-sm sm:text-base line-clamp-1">
+                            <h4 className="text-gray-900 font-medium text-sm sm:text-base line-clamp-1 pr-6">
                               {notification.title}
                             </h4>
                             {!notification.is_read && (
-                              <span className="flex-shrink-0 w-2 h-2 bg-cyan-500 rounded-full mt-1 sm:mt-1.5" />
+                              <span className="flex-shrink-0 w-2 h-2 bg-red-500 rounded-full mt-1 sm:mt-1.5" />
                             )}
                           </div>
-                          <p className="text-xs sm:text-sm text-gray-300 mt-1 line-clamp-2">
+                          <p className="text-xs sm:text-sm text-gray-700 mt-1 line-clamp-2">
                             {notification.message}
                           </p>
                           <p className="text-[10px] sm:text-xs text-gray-500 mt-1 sm:mt-2">
@@ -216,6 +284,16 @@ export default function NotificationBell() {
                             })}
                           </p>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notification.id);
+                          }}
+                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 hover:bg-red-100 text-gray-400 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                          title="Supprimer"
+                        >
+                          <X className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </button>
                       </div>
                     </motion.div>
                   ))
@@ -235,11 +313,11 @@ export default function NotificationBell() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.1);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(0, 0, 0, 0.2);
         }
       `}</style>
     </div>

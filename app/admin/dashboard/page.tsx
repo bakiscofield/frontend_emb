@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/store';
 import { transactionsAPI, settingsAPI } from '@/lib/api';
 import Header from '@/components/Header';
 import NotificationBell from '@/components/NotificationBell';
+import NotificationSettings from '@/components/NotificationSettings';
 import TransactionPDFModal from '@/components/TransactionPDFModal';
 import toast from 'react-hot-toast';
 import {
@@ -35,6 +36,7 @@ interface Transaction {
   to_number?: string;
   exchange_pair_id?: number;
   exchange_pair_name?: string;
+  exchange_pair_category?: string;
   amount: number;
   percentage: number;
   total_amount: number;
@@ -42,6 +44,7 @@ interface Transaction {
   status: string;
   bookmaker_name?: string;
   notes?: string;
+  admin_message?: string;
   created_at: string;
   validated_at?: string;
 }
@@ -64,6 +67,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [validationComment, setValidationComment] = useState('');
+  const [adminMessage, setAdminMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [pdfTransaction, setPdfTransaction] = useState<Transaction | null>(null);
@@ -97,16 +101,25 @@ export default function AdminDashboard() {
   };
 
   const handleValidation = async (transactionId: number, status: 'validated' | 'rejected') => {
+    // Vérifier si c'est un abonnement et si le message est requis
+    const isSubscription = selectedTransaction?.exchange_pair_category === 'subscription';
+    if (status === 'validated' && isSubscription && !adminMessage.trim()) {
+      toast.error('Le message est requis pour valider un abonnement');
+      return;
+    }
+
     setLoading(true);
     try {
       await transactionsAPI.validateTransaction(transactionId.toString(), {
         status,
-        comment: validationComment
+        comment: validationComment,
+        admin_message: adminMessage.trim() || undefined
       });
 
       toast.success(`Transaction ${status === 'validated' ? 'validée' : 'rejetée'} avec succès`);
       setSelectedTransaction(null);
       setValidationComment('');
+      setAdminMessage('');
       loadData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur lors de la validation');
@@ -272,7 +285,7 @@ export default function AdminDashboard() {
             <div className="card-emile">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Commission totale</p>
+                  <p className="text-sm text-gray-400">Frais totaux</p>
                   <p className="text-2xl font-bold text-emile-green">
                     {stats.total_commission.toFixed(0)} FCFA
                   </p>
@@ -292,8 +305,16 @@ export default function AdminDashboard() {
           </div>
         ) : activeTab === 'settings' ? (
           <div className="space-y-6">
+            {/* Notification Settings */}
+            <div>
+              <h3 className="text-lg font-bold text-white mb-4">Notifications Push</h3>
+              <NotificationSettings />
+            </div>
+
             {/* Configuration rapide */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-white mb-4 mt-8">Configuration rapide</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div
                 onClick={() => router.push('/admin/payment-methods')}
                 className="card-emile cursor-pointer hover:border-emile-green/50 transition-all group"
@@ -323,6 +344,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
 
           </div>
@@ -422,7 +444,7 @@ export default function AdminDashboard() {
                           {transaction.amount.toFixed(0)} FCFA
                         </div>
                         <div className="text-sm text-gray-400">
-                          Commission: {((transaction.total_amount - transaction.amount)).toFixed(0)} FCFA
+                          Frais: {((transaction.total_amount - transaction.amount)).toFixed(0)} FCFA
                         </div>
                         <div className="text-sm font-medium text-emile-green">
                           Total: {transaction.total_amount.toFixed(0)} FCFA
@@ -432,10 +454,31 @@ export default function AdminDashboard() {
 
                     {activeTab === 'pending' && selectedTransaction?.id === transaction.id && (
                       <div className="border-t border-white/10 pt-4 mt-4 space-y-3">
+                        {transaction.exchange_pair_category === 'subscription' && (
+                          <div className="bg-blue-900/20 border-2 border-blue-500/30 rounded-lg p-4 mb-3">
+                            <label className="block text-sm font-semibold text-blue-300 mb-2">
+                              📋 Message pour le client (REQUIS pour les abonnements) *
+                            </label>
+                            <textarea
+                              className="input-emile"
+                              rows={4}
+                              placeholder="Ex: Votre abonnement Canalbox a été activé avec succès. Numéro de décodeur: 123456789. Profitez de vos programmes!"
+                              value={adminMessage}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setAdminMessage(e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <p className="text-xs text-blue-400 mt-2">
+                              Ce message sera envoyé au client par notification et email
+                            </p>
+                          </div>
+                        )}
                         <textarea
                           className="input-emile"
                           rows={2}
-                          placeholder="Commentaire (optionnel)..."
+                          placeholder="Commentaire interne (optionnel)..."
                           value={validationComment}
                           onChange={(e) => {
                             e.stopPropagation();

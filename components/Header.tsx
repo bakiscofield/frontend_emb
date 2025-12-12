@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck } from 'lucide-react';
+import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck, FileText, Settings as SettingsIcon } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import VerifiedBadge from './VerifiedBadge';
@@ -168,6 +168,18 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <span className="hidden sm:inline">Newsletters</span>
               </button>
               <button
+                onClick={() => router.push('/admin/email-templates')}
+                className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
+                  pathname === '/admin/email-templates'
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200'
+                }`}
+                title="Templates Emails"
+              >
+                <FileText className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Templates</span>
+              </button>
+              <button
                 onClick={() => router.push('/admin/chat')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
                   pathname === '/admin/chat'
@@ -190,6 +202,18 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
               >
                 <FileCheck className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">KYC</span>
+              </button>
+              <button
+                onClick={() => router.push('/admin/settings')}
+                className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
+                  pathname === '/admin/settings'
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                }`}
+                title="Paramètres"
+              >
+                <SettingsIcon className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Paramètres</span>
               </button>
             </div>
           </div>
