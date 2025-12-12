@@ -228,4 +228,13 @@ export const chatAPI = {
   reopenConversation: (id: string) => api.post(`/chat/admin/reopen/${id}`),
 };
 
+// Email Templates
+export const emailTemplatesAPI = {
+  getAll: () => api.get('/email-templates'),
+  getById: (id: string) => api.get(`/email-templates/${id}`),
+  create: (data: any) => api.post('/email-templates', data),
+  update: (id: string, data: any) => api.put(`/email-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/email-templates/${id}`),
+};
+
 export default api;
