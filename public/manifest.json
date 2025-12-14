@@ -163,6 +163,5 @@
   "handle_links": "preferred",
   "scope_extensions": [
     {"origin": "*.alicebot.me"}
-  ],
-  "gcm_sender_id": "103953800507"
+  ]
 }
