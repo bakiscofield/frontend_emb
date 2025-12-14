@@ -1,7 +1,7 @@
 const withPWA = require('next-pwa')({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development', // Désactiver en dev, actif en prod
-  register: true, // Activer l'enregistrement automatique
+  register: false, // Désactiver auto-register - on utilise register-sw.tsx
   skipWaiting: true,
   sw: 'sw.js',
   scope: '/',

@@ -14,15 +14,12 @@ export default function RegisterServiceWorker() {
   useEffect(() => {
     // Vérifier le support du service worker
     if ('serviceWorker' in navigator && typeof window !== 'undefined') {
-
-      // Attendre que la page soit complètement chargée
-      window.addEventListener('load', () => {
-        // Enregistrer le service worker
-        navigator.serviceWorker
-          .register('/sw.js', {
-            scope: '/',
-            updateViaCache: 'none'
-          })
+      // Enregistrer le service worker immédiatement
+      navigator.serviceWorker
+        .register('/sw.js', {
+          scope: '/',
+          updateViaCache: 'none'
+        })
           .then((registration) => {
             console.log('[SW] Service Worker enregistré avec succès');
             console.log('[SW] Scope:', registration.scope);
@@ -143,9 +140,8 @@ export default function RegisterServiceWorker() {
           }
         });
 
-        window.addEventListener('offline', () => {
-          console.log('[Network] Application hors ligne');
-        });
+      window.addEventListener('offline', () => {
+        console.log('[Network] Application hors ligne');
       });
     } else {
       console.warn('[SW] Service Worker non supporté par ce navigateur');
