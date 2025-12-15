@@ -25,6 +25,14 @@ interface EmailTemplate {
   is_active: boolean;
 }
 
+interface ConfigItem {
+  id: number;
+  key: string;
+  value: string;
+  description: string | null;
+  updated_at: string;
+}
+
 export default function AdminSettingsPage() {
   const router = useRouter();
   const { admin, isAdmin, isAuthenticated, logoutAdmin } = useAuthStore();
@@ -35,6 +43,9 @@ export default function AdminSettingsPage() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [configs, setConfigs] = useState<ConfigItem[]>([]);
+  const [editingConfig, setEditingConfig] = useState<string | null>(null);
+  const [configValues, setConfigValues] = useState<Record<string, string>>({});
 
   const [editForm, setEditForm] = useState({
     subject: '',
@@ -50,6 +61,7 @@ export default function AdminSettingsPage() {
       router.push('/admin/login');
     } else {
       loadTemplates();
+      loadConfigs();
     }
   }, [isAuthenticated, isAdmin, router]);
 
@@ -71,6 +83,54 @@ export default function AdminSettingsPage() {
       toast.error('Erreur lors du chargement des templates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadConfigs = async () => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/settings/config`,
+        {
+          headers: { Authorization: `Bearer ${useAuthStore.getState().token}` }
+        }
+      );
+
+      if (response.data.success) {
+        const configsData = response.data.configs;
+        setConfigs(configsData);
+
+        // Initialiser les valeurs modifiables
+        const values: Record<string, string> = {};
+        configsData.forEach((config: ConfigItem) => {
+          values[config.key] = config.value;
+        });
+        setConfigValues(values);
+      }
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des configurations:', error);
+      toast.error('Erreur lors du chargement des configurations');
+    }
+  };
+
+  const handleSaveConfig = async (key: string) => {
+    try {
+      setSaving(true);
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/settings/config/${key}`,
+        { value: configValues[key] },
+        {
+          headers: { Authorization: `Bearer ${useAuthStore.getState().token}` }
+        }
+      );
+
+      toast.success('Configuration mise à jour avec succès');
+      setEditingConfig(null);
+      loadConfigs();
+    } catch (error: any) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      toast.error(error.response?.data?.message || 'Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -335,10 +395,131 @@ export default function AdminSettingsPage() {
         )}
 
         {activeTab === 'general' && (
-          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
-            <p className="text-gray-400 text-center py-8">
-              Section des paramètres généraux (à venir)
-            </p>
+          <div className="space-y-4">
+            {configs
+              .filter(config => {
+                // Filtrer les configurations à ne pas afficher
+                const hiddenKeys = ['commission_percentage', 'max_amount', 'min_amount'];
+                return !hiddenKeys.includes(config.key);
+              })
+              .map((config) => {
+              const isMonthlyLimit = config.key === 'monthly_limit_without_kyc' || config.key === 'monthly_limit_with_kyc';
+              const isEditing = editingConfig === config.key;
+
+              const isWithKyc = config.key === 'monthly_limit_with_kyc';
+              const borderColor = isMonthlyLimit
+                ? (isWithKyc ? 'border-green-500/50 bg-gradient-to-r from-green-900/10 to-emerald-900/10' : 'border-yellow-500/50 bg-gradient-to-r from-yellow-900/10 to-orange-900/10')
+                : 'border-gray-700 hover:border-cyan-500/50';
+              const titleColor = isMonthlyLimit
+                ? (isWithKyc ? 'text-green-400' : 'text-yellow-400')
+                : 'text-white';
+
+              return (
+                <motion.div
+                  key={config.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`bg-gray-800/50 backdrop-blur-sm border rounded-xl p-6 transition-all ${borderColor}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {isMonthlyLimit && (
+                          <span className="text-2xl">{isWithKyc ? '✅' : '🔒'}</span>
+                        )}
+                        <h3 className={`text-lg font-semibold ${titleColor}`}>
+                          {config.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </h3>
+                      </div>
+                      {config.description && (
+                        <p className="text-sm text-gray-400 mb-3">{config.description}</p>
+                      )}
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-3 mt-3">
+                          <input
+                            type="number"
+                            value={configValues[config.key] || ''}
+                            onChange={(e) => setConfigValues({
+                              ...configValues,
+                              [config.key]: e.target.value
+                            })}
+                            className="flex-1 px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-cyan-500 focus:outline-none"
+                            placeholder="Entrez la valeur"
+                          />
+                          <button
+                            onClick={() => handleSaveConfig(config.key)}
+                            disabled={saving}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                          >
+                            <Save className="w-4 h-4" />
+                            {saving ? 'Enregistrement...' : 'Enregistrer'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingConfig(null);
+                              // Réinitialiser la valeur
+                              setConfigValues({
+                                ...configValues,
+                                [config.key]: config.value
+                              });
+                            }}
+                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                            Annuler
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 mt-3">
+                          <div className="px-4 py-2 bg-gray-900/50 rounded-lg">
+                            <span className="text-2xl font-bold text-cyan-400">
+                              {Number(config.value).toLocaleString()}
+                            </span>
+                            <span className="text-sm text-gray-400 ml-2">
+                              {config.key.includes('amount') || config.key.includes('limit') ? 'FCFA' : ''}
+                              {config.key.includes('percentage') ? '%' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {isMonthlyLimit && !isEditing && (
+                        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                          <p className="text-xs text-blue-300">
+                            💡 {isWithKyc
+                              ? 'Cette limite s\'applique aux utilisateurs avec KYC validé.'
+                              : 'Cette limite s\'applique aux utilisateurs sans KYC validé. Ils peuvent augmenter leur limite en validant leur KYC.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isEditing && (
+                      <button
+                        onClick={() => setEditingConfig(config.key)}
+                        className="p-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg transition-colors"
+                        title="Modifier"
+                      >
+                        <Edit className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-500">
+                    Dernière modification: {new Date(config.updated_at).toLocaleString('fr-FR')}
+                  </div>
+                </motion.div>
+              );
+            })}
+
+            {configs.length === 0 && (
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+                <p className="text-gray-400 text-center py-8">
+                  Aucune configuration disponible
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,13 +1,14 @@
 const withPWA = require('next-pwa')({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // Désactiver en dev, actif en prod
-  register: false, // Désactiver auto-register - on utilise register-sw.tsx
+  disable: false, // TOUJOURS activé (dev et prod)
+  register: true, // Auto-register activé pour PWA Builder
   skipWaiting: true,
   sw: 'sw.js',
   scope: '/',
   reloadOnOnline: true,
   fallbacks: {
     document: '/offline.html',
+    image: '/images/fallback.png',
   },
   buildExcludes: [/middleware-manifest\.json$/, /\.map$/],
   publicExcludes: ['!robots.txt', '!sitemap.xml'],
@@ -113,10 +114,6 @@ const nextConfig = {
   // Désactiver ESLint pendant le build
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  // Désactiver la collecte de traces qui cause des problèmes
-  experimental: {
-    outputFileTracingRoot: undefined,
   },
   // Headers pour le service worker et le manifest
   async headers() {

@@ -111,6 +111,13 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCheckingReference, setIsCheckingReference] = useState(false);
   const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [monthlyLimitInfo, setMonthlyLimitInfo] = useState<{
+    current_total: number;
+    limit: number | null;
+    remaining: number | null;
+    has_kyc: boolean;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     initAuth();
@@ -132,6 +139,7 @@ export default function DashboardPage() {
       fetchPairs();
       fetchTransactions();
       fetchSettings();
+      fetchMonthlyLimit();
     }
   }, [isAuthenticated]);
 
@@ -179,6 +187,15 @@ export default function DashboardPage() {
       setMaxAmount(parseFloat(maxRes.data.config.value));
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const fetchMonthlyLimit = async () => {
+    try {
+      const response = await transactionsAPI.getMonthlyLimit();
+      setMonthlyLimitInfo(response.data.data);
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la limite mensuelle:', error);
     }
   };
 
@@ -326,8 +343,23 @@ export default function DashboardPage() {
         dynamic_fields: {}
       });
       fetchTransactions();
+      fetchMonthlyLimit(); // Rafraîchir les informations de limite
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Une erreur est survenue');
+      const errorMessage = error.response?.data?.message || 'Une erreur est survenue';
+      const errorCode = error.response?.data?.error_code;
+
+      // Gestion spécifique de l'erreur de dépassement de limite
+      if (errorCode === 'MONTHLY_LIMIT_EXCEEDED') {
+        toast.error(
+          errorMessage,
+          {
+            duration: 6000,
+            icon: '🚫',
+          }
+        );
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -399,6 +431,84 @@ export default function DashboardPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Monthly Limit Info */}
+          {monthlyLimitInfo && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 sm:mb-8"
+            >
+              <GlassCard className={`p-4 sm:p-6 border-2 ${
+                monthlyLimitInfo.has_kyc
+                  ? 'border-green-500/30 bg-gradient-to-r from-green-900/10 to-emerald-900/10'
+                  : 'border-yellow-500/30 bg-gradient-to-r from-yellow-900/10 to-orange-900/10'
+              }`}>
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className={`p-2 sm:p-3 rounded-lg flex-shrink-0 ${
+                    monthlyLimitInfo.has_kyc ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                  }`}>
+                    <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                      monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
+                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`text-base sm:text-lg font-bold mb-2 ${
+                      monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
+                    }`}>
+                      {monthlyLimitInfo.has_kyc ? 'Limite mensuelle (KYC validé)' : 'Limite mensuelle'}
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-sm sm:text-base">
+                        <span className="text-gray-300">Utilisé ce mois:</span>
+                        <span className="font-bold text-white">{monthlyLimitInfo.current_total.toLocaleString()} FCFA</span>
+                      </div>
+                      {monthlyLimitInfo.limit && (
+                        <>
+                          <div className="flex justify-between items-center text-sm sm:text-base">
+                            <span className="text-gray-300">Limite mensuelle:</span>
+                            <span className="font-bold text-white">{monthlyLimitInfo.limit.toLocaleString()} FCFA</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm sm:text-base">
+                            <span className="text-gray-300">Restant:</span>
+                            <span className="font-bold text-green-400">{monthlyLimitInfo.remaining?.toLocaleString()} FCFA</span>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 80
+                                  ? 'bg-red-500'
+                                  : ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 50
+                                  ? 'bg-yellow-500'
+                                  : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {!monthlyLimitInfo.has_kyc && (
+                      <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs sm:text-sm text-blue-300">
+                          💡 <strong>Validez votre KYC</strong> pour augmenter votre limite mensuelle !
+                          <button
+                            onClick={() => router.push('/dashboard/kyc')}
+                            className="ml-2 underline hover:text-blue-200 transition-colors"
+                          >
+                            Compléter mon KYC →
+                          </button>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </GlassCard>
+            </motion.div>
+          )}
 
           {/* Notification Settings */}
           <div className="mb-6 sm:mb-8">

@@ -102,6 +102,7 @@ export const transactionsAPI = {
   validateTransaction: (id: string, data: any) => api.put(`/transactions/${id}/validate`, data),
   getStats: () => api.get('/transactions/stats/overview'),
   checkReference: (reference: string) => api.get(`/transactions/check-reference/${reference}`),
+  getMonthlyLimit: () => api.get('/transactions/monthly-limit'),
 };
 
 // Settings
