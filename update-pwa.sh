@@ -15,6 +15,20 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 NC='\033[0m'
 
+# 0. Git Pull - Récupération des dernières modifications
+echo "📥 Étape 0: Récupération du code depuis Git..."
+echo ""
+
+git pull
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Erreur lors du git pull${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Code mis à jour depuis Git${NC}"
+echo ""
+
 # 1. Vérification des fichiers PWA essentiels
 echo "📋 Étape 1: Vérification des fichiers PWA..."
 echo ""
