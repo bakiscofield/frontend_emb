@@ -305,11 +305,11 @@ export default function AdminDashboard() {
           </div>
         ) : activeTab === 'settings' ? (
           <div className="space-y-6">
-            {/* Notification Settings */}
-            <div>
+            {/* Notification Settings - DÉSACTIVÉ */}
+            {/* <div>
               <h3 className="text-lg font-bold text-white mb-4">Notifications Push</h3>
               <NotificationSettings />
-            </div>
+            </div> */}
 
             {/* Configuration rapide */}
             <div>

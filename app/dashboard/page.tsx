@@ -510,10 +510,10 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
-          {/* Notification Settings */}
-          <div className="mb-6 sm:mb-8">
+          {/* Notification Settings - DÉSACTIVÉ */}
+          {/* <div className="mb-6 sm:mb-8">
             <NotificationSettings />
-          </div>
+          </div> */}
 
         {/* Actions */}
         <div className="flex gap-2 sm:gap-3 mb-6 sm:mb-8">
