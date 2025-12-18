@@ -34,8 +34,10 @@ install_production() {
     log "Installation en mode production..."
 
     # Frontend (dossier actuel)
-    log "Installation du frontend..."
-    npm ci --omit=dev
+    log "Installation des dépendances (avec devDependencies pour le build)..."
+    npm ci
+
+    log "Build du frontend..."
     npm run build
 
     log "Installation terminée!"
