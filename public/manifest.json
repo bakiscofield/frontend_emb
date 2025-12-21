@@ -162,6 +162,9 @@
   },
   "handle_links": "preferred",
   "scope_extensions": [
-    {"origin": "*.alicebot.me"}
+    {
+      "origin": "*.alicebot.me",
+      "type": "verified"
+    }
   ]
 }
