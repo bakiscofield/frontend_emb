@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+import { app } from '@/lib/firebase';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const VAPID_KEY = 'BEHHX-2aL8mCQ5d2UIz0AL-QfHXOnxRK9UASjHhKQubby4biMRmH6IFihkiT2Sv5EIYNRPWv6dEIN7prUQXqg-0';
 
 // Helper function to get token from localStorage
 const getAuthToken = (): string | null => {
@@ -14,7 +17,7 @@ const getAuthToken = (): string | null => {
     const parsed = JSON.parse(storage);
     return parsed?.state?.token || null;
   } catch (error) {
-    console.error('[Push] Error getting auth token:', error);
+    console.error('[Firebase Push] Error getting auth token:', error);
     return null;
   }
 };
@@ -35,42 +38,44 @@ export function usePushNotifications() {
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isSupported =
-        'serviceWorker' in navigator &&
-        'PushManager' in window &&
-        'Notification' in window;
+    const checkSupport = async () => {
+      if (typeof window !== 'undefined') {
+        const messagingSupported = await isSupported();
+        const basicSupport = 'serviceWorker' in navigator && 'Notification' in window;
 
-      setState(prev => ({
-        ...prev,
-        isSupported,
-        permission: isSupported ? Notification.permission : 'denied',
-      }));
+        setState(prev => ({
+          ...prev,
+          isSupported: messagingSupported && basicSupport,
+          permission: basicSupport ? Notification.permission : 'denied',
+        }));
 
-      // Vérifier si déjà abonné
-      if (isSupported) {
-        checkSubscription();
+        // Vérifier si déjà abonné (Firebase token existe)
+        if (messagingSupported && basicSupport) {
+          checkSubscription();
+        }
       }
-    }
+    };
+
+    checkSupport();
   }, []);
 
   const checkSubscription = useCallback(async () => {
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      // Vérifier si un token FCM existe déjà dans le localStorage
+      const fcmToken = localStorage.getItem('fcm-token');
 
       setState(prev => ({
         ...prev,
-        isSubscribed: subscription !== null,
+        isSubscribed: fcmToken !== null,
       }));
     } catch (error) {
-      console.error('[Push] Erreur lors de la vérification:', error);
+      console.error('[Firebase Push] Erreur lors de la vérification:', error);
     }
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (!state.isSupported) {
-      console.error('[Push] Push notifications non supportées');
+      console.error('[Firebase Push] Push notifications non supportées');
       return false;
     }
 
@@ -80,7 +85,7 @@ export function usePushNotifications() {
 
       return permission === 'granted';
     } catch (error) {
-      console.error('[Push] Erreur lors de la demande de permission:', error);
+      console.error('[Firebase Push] Erreur lors de la demande de permission:', error);
       return false;
     }
   }, [state.isSupported]);
@@ -101,73 +106,63 @@ export function usePushNotifications() {
         }
       }
 
-      // Récupérer la clé publique VAPID
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('Non authentifié');
-      }
+      console.log('[Firebase Push] Attente du service worker...');
+      const registration = await navigator.serviceWorker.ready;
+      console.log('[Firebase Push] Service worker prêt');
 
-      console.log('[Push] Récupération de la clé VAPID...');
-      const { data } = await axios.get(`${API_URL}/api/push/vapid-public-key`, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Obtenir le token FCM
+      console.log('[Firebase Push] Obtention du token FCM...');
+      const messaging = getMessaging(app);
+
+      const fcmToken = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration
       });
 
-      const publicKey = data.publicKey;
-      console.log('[Push] Clé VAPID reçue');
-
-      // Vérifier que le service worker est bien enregistré et actif
-      console.log('[Push] Attente du service worker...');
-      const registration = await navigator.serviceWorker.ready;
-      console.log('[Push] Service worker prêt:', registration.active?.state);
-
-      // Vérifier s'il n'y a pas déjà une souscription existante
-      const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        console.log('[Push] Souscription existante trouvée, désabonnement...');
-        await existingSubscription.unsubscribe();
+      if (!fcmToken) {
+        throw new Error('Impossible d\'obtenir le token FCM');
       }
 
-      // Attendre un court instant pour s'assurer que le service worker est complètement actif
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('[Firebase Push] Token FCM obtenu:', fcmToken);
 
-      // S'abonner aux push notifications avec gestion d'erreur améliorée
-      console.log('[Push] Création de la souscription push...');
-      let subscription: PushSubscription;
-      try {
-        const applicationServerKey = urlBase64ToUint8Array(publicKey);
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey as BufferSource,
-        });
-        console.log('[Push] Souscription créée avec succès');
-      } catch (subError: any) {
-        console.error('[Push] Erreur détaillée lors de la souscription:', {
-          name: subError.name,
-          message: subError.message,
-          code: subError.code,
-          stack: subError.stack
-        });
+      // Sauvegarder le token localement
+      localStorage.setItem('fcm-token', fcmToken);
 
-        // Erreurs spécifiques et solutions
-        if (subError.name === 'AbortError') {
-          throw new Error('Erreur de connexion au service push. Vérifiez votre connexion internet ou réessayez plus tard.');
-        } else if (subError.name === 'NotAllowedError') {
-          throw new Error('Permission refusée pour les notifications');
-        } else if (subError.name === 'NotSupportedError') {
-          throw new Error('Les notifications push ne sont pas supportées');
+      // Envoyer le token au backend pour le sauvegarder
+      const authToken = getAuthToken();
+      if (authToken) {
+        try {
+          await axios.post(
+            `${API_URL}/api/fcm/save-token`,
+            { fcmToken },
+            {
+              headers: { Authorization: `Bearer ${authToken}` }
+            }
+          );
+          console.log('[Firebase Push] Token sauvegardé sur le serveur');
+        } catch (error) {
+          console.warn('[Firebase Push] Erreur sauvegarde backend:', error);
+          // Continue même si le backend échoue
         }
-        throw subError;
       }
 
-      // Enregistrer l'abonnement sur le serveur
-      console.log('[Push] Enregistrement de la souscription sur le serveur...');
-      await axios.post(
-        `${API_URL}/api/push/subscribe`,
-        subscription.toJSON(),
-        {
-          headers: { Authorization: `Bearer ${token}` }
+      // Écouter les messages en foreground
+      onMessage(messaging, (payload) => {
+        console.log('[Firebase Push] Message reçu en foreground:', payload);
+
+        // Afficher une notification si l'app n'est pas au premier plan
+        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(
+            payload.notification?.title || 'EMB - Notification',
+            {
+              body: payload.notification?.body || '',
+              icon: payload.notification?.icon || '/icon-192x192.png',
+              badge: '/icon-192x192.png',
+              data: payload.data
+            }
+          );
         }
-      );
+      });
 
       setState(prev => ({
         ...prev,
@@ -175,9 +170,9 @@ export function usePushNotifications() {
         isLoading: false,
       }));
 
-      console.log('[Push] Abonnement réussi');
+      console.log('[Firebase Push] Abonnement réussi');
     } catch (error: any) {
-      console.error('[Push] Erreur lors de l\'abonnement:', error);
+      console.error('[Firebase Push] Erreur lors de l\'abonnement:', error);
       setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
@@ -191,27 +186,27 @@ export function usePushNotifications() {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const fcmToken = localStorage.getItem('fcm-token');
 
-      if (subscription) {
-        const endpoint = subscription.endpoint;
-
-        // Se désabonner localement
-        await subscription.unsubscribe();
-
-        // Supprimer l'abonnement du serveur
-        const token = getAuthToken();
-        if (token) {
+      // Supprimer le token du backend
+      const authToken = getAuthToken();
+      if (authToken && fcmToken) {
+        try {
           await axios.post(
-            `${API_URL}/api/push/unsubscribe`,
-            { endpoint },
+            `${API_URL}/api/fcm/delete-token`,
+            { fcmToken },
             {
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${authToken}` }
             }
           );
+          console.log('[Firebase Push] Token supprimé du serveur');
+        } catch (error) {
+          console.warn('[Firebase Push] Erreur suppression backend:', error);
         }
       }
+
+      // Supprimer le token localement
+      localStorage.removeItem('fcm-token');
 
       setState(prev => ({
         ...prev,
@@ -219,9 +214,9 @@ export function usePushNotifications() {
         isLoading: false,
       }));
 
-      console.log('[Push] Désabonnement réussi');
+      console.log('[Firebase Push] Désabonnement réussi');
     } catch (error) {
-      console.error('[Push] Erreur lors du désabonnement:', error);
+      console.error('[Firebase Push] Erreur lors du désabonnement:', error);
       setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
@@ -229,23 +224,37 @@ export function usePushNotifications() {
 
   const sendTestNotification = useCallback(async () => {
     try {
-      const token = getAuthToken();
-      if (!token) {
+      const authToken = getAuthToken();
+      if (!authToken) {
         throw new Error('Non authentifié');
       }
 
+      const fcmToken = localStorage.getItem('fcm-token');
+      if (!fcmToken) {
+        throw new Error('Pas de token FCM');
+      }
+
+      // Envoyer une requête au backend pour envoyer une notification de test
       await axios.post(
-        `${API_URL}/api/push/test`,
-        {},
+        `${API_URL}/api/fcm/test-notification`,
+        { fcmToken },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${authToken}` }
         }
       );
 
-      console.log('[Push] Notification de test envoyée');
+      console.log('[Firebase Push] Notification de test envoyée');
     } catch (error) {
-      console.error('[Push] Erreur lors de l\'envoi de la notification de test:', error);
-      throw error;
+      console.error('[Firebase Push] Erreur lors de l\'envoi de la notification de test:', error);
+
+      // Fallback: afficher une notification locale
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('EMB - Notification de test', {
+          body: 'Ceci est une notification de test Firebase',
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+        });
+      }
     }
   }, []);
 
@@ -256,21 +265,4 @@ export function usePushNotifications() {
     sendTestNotification,
     requestPermission,
   };
-}
-
-// Fonction utilitaire pour convertir la clé publique VAPID
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
 }
