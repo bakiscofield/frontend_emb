@@ -36,9 +36,8 @@ export async function getFCMToken(): Promise<string | null> {
     }
 
     // Obtenir le token FCM
-    // IMPORTANT: Remplacez cette valeur par votre clé VAPID depuis Firebase Console
-    // Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
-    const vapidKey = 'VOTRE_CLE_VAPID_ICI'; // À remplacer
+    // Clé VAPID depuis Firebase Console
+    const vapidKey = 'BEHHX-2aL8mCQ5d2UIz0AL-QfHXOnxRK9UASjHhKQubby4biMRmH6IFihkiT2Sv5EIYNRPWv6dEIN7prUQXqg-0';
 
     const token = await getToken(messaging, {
       vapidKey,
