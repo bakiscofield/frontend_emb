@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef } from 'react';
-import { X, Printer, Download } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X, Printer, Download, Loader2 } from 'lucide-react';
 import TransactionReceipt from './TransactionReceipt';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import toast from 'react-hot-toast';
 
 interface Transaction {
   id: number;
@@ -35,6 +36,7 @@ interface TransactionPDFModalProps {
 
 export default function TransactionPDFModal({ transaction, onClose }: TransactionPDFModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handlePrint = () => {
     window.print();
@@ -43,29 +45,60 @@ export default function TransactionPDFModal({ transaction, onClose }: Transactio
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
 
+    setIsGenerating(true);
+    const loadingToast = toast.loading('Génération du PDF en cours...');
+
     try {
-      // Capture l'élément HTML en canvas
+      // Capture l'élément HTML en canvas avec une meilleure qualité
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
+        scale: 3, // Haute qualité
         backgroundColor: '#ffffff',
         logging: false,
+        useCORS: true,
+        allowTaint: true,
+        windowWidth: receiptRef.current.scrollWidth,
+        windowHeight: receiptRef.current.scrollHeight,
       });
 
       // Créer le PDF
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/png', 1.0); // Qualité maximale
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
+        compress: true, // Compression pour réduire la taille
       });
 
-      const imgWidth = 210; // A4 width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      // Si le contenu dépasse une page, gérer le multi-pages
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Première page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfHeight;
+
+      // Pages suivantes si nécessaire
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pdfHeight;
+      }
+
+      // Télécharger le PDF
       pdf.save(`recu-${transaction.transaction_id}.pdf`);
+
+      toast.success('PDF téléchargé avec succès!', { id: loadingToast });
     } catch (error) {
       console.error('Erreur lors de la génération du PDF:', error);
+      toast.error('Erreur lors de la génération du PDF', { id: loadingToast });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -83,11 +116,21 @@ export default function TransactionPDFModal({ transaction, onClose }: Transactio
             <div className="flex gap-2">
               <button
                 onClick={handleDownloadPDF}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                disabled={isGenerating}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:bg-blue-300 disabled:cursor-not-allowed"
                 title="Télécharger PDF"
               >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Télécharger</span>
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Génération...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Télécharger</span>
+                  </>
+                )}
               </button>
               <button
                 onClick={handlePrint}
