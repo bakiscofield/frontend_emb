@@ -56,14 +56,14 @@ export default function NotificationSettings() {
 
   if (!isSupported) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
           <div>
-            <h3 className="font-medium text-yellow-900">
+            <h3 className="font-medium text-yellow-300">
               Notifications non supportées
             </h3>
-            <p className="text-sm text-yellow-700 mt-1">
+            <p className="text-sm text-yellow-400/80 mt-1">
               Votre navigateur ne supporte pas les notifications push.
             </p>
           </div>
@@ -73,31 +73,31 @@ export default function NotificationSettings() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="bg-gray-800/50 border border-white/10 rounded-lg p-6 backdrop-blur-sm">
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <div className={`p-3 rounded-lg ${
-            isSubscribed ? 'bg-green-100' : 'bg-gray-100'
+            isSubscribed ? 'bg-emile-green/20' : 'bg-gray-700/50'
           }`}>
             {isSubscribed ? (
-              <Bell className="w-6 h-6 text-green-600" />
+              <Bell className="w-6 h-6 text-emile-green" />
             ) : (
-              <BellOff className="w-6 h-6 text-gray-600" />
+              <BellOff className="w-6 h-6 text-gray-400" />
             )}
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Notifications Push
+            <h3 className="text-lg font-semibold text-white">
+              Notifications Push Firebase
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-400 mt-1">
               {isSubscribed
-                ? 'Vous recevez les notifications en temps réel'
+                ? 'Vous recevez les notifications en temps réel 🔔'
                 : 'Activez les notifications pour rester informé'}
             </p>
 
             {permission === 'denied' && (
-              <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="mt-3 text-sm text-red-300 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
                 <AlertCircle className="w-4 h-4 inline mr-2" />
                 Les notifications sont bloquées. Autorisez-les dans les paramètres de votre navigateur.
               </div>
@@ -106,8 +106,8 @@ export default function NotificationSettings() {
             {message && (
               <div className={`mt-3 text-sm rounded-lg p-3 flex items-center gap-2 ${
                 message.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
+                  ? 'bg-emile-green/20 text-emile-green border border-emile-green/30'
+                  : 'bg-red-900/20 text-red-300 border border-red-500/30'
               }`}>
                 {message.type === 'success' ? (
                   <Check className="w-4 h-4" />
@@ -126,8 +126,8 @@ export default function NotificationSettings() {
             disabled={isLoading || permission === 'denied'}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               isSubscribed
-                ? 'bg-red-600 hover:bg-red-700 text-white disabled:bg-red-300'
-                : 'bg-cyan-600 hover:bg-cyan-700 text-white disabled:bg-cyan-300'
+                ? 'bg-emile-red hover:bg-emile-red/80 text-white disabled:bg-emile-red/30'
+                : 'bg-emile-green hover:bg-emile-green/80 text-white disabled:bg-emile-green/30'
             } disabled:cursor-not-allowed`}
           >
             {isLoading ? (
@@ -152,7 +152,7 @@ export default function NotificationSettings() {
             <button
               onClick={handleTest}
               disabled={testLoading}
-              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-600/30 disabled:cursor-not-allowed"
             >
               {testLoading ? (
                 <>
