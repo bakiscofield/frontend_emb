@@ -30,7 +30,7 @@ export default function AnimatedInput({
         <motion.label
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="block text-sm font-medium text-gray-200 mb-2"
+          className="block text-xs sm:text-sm font-medium text-gray-200 mb-1.5 sm:mb-2"
         >
           {label}
           {props.required && <span className="text-red-400 ml-1">*</span>}
@@ -45,7 +45,7 @@ export default function AnimatedInput({
           className={`
             relative flex items-center
             bg-white/5 backdrop-blur-sm
-            border-2 rounded-xl
+            border sm:border-2 rounded-lg sm:rounded-xl
             transition-all duration-300
             ${
               isFocused
@@ -58,14 +58,14 @@ export default function AnimatedInput({
         >
           {/* Icon */}
           {icon && (
-            <div className="absolute left-4 text-gray-400 pointer-events-none">
+            <div className="absolute left-3 sm:left-4 text-gray-400 pointer-events-none">
               {icon}
             </div>
           )}
 
           {/* Prefix */}
           {prefix && (
-            <div className="pl-4 text-gray-400 font-medium">
+            <div className="pl-3 sm:pl-4 text-gray-400 font-medium text-sm sm:text-base">
               {prefix}
             </div>
           )}
@@ -77,12 +77,13 @@ export default function AnimatedInput({
             onBlur={() => setIsFocused(false)}
             className={`
               flex-1 w-full
-              ${icon ? 'pl-12' : prefix ? 'pl-2' : 'pl-4'}
-              ${suffix ? 'pr-12' : 'pr-4'}
-              py-3
+              ${icon ? 'pl-10 sm:pl-12' : prefix ? 'pl-2' : 'pl-3 sm:pl-4'}
+              ${suffix ? 'pr-10 sm:pr-12' : 'pr-3 sm:pr-4'}
+              py-2 sm:py-3
               bg-transparent
               text-white placeholder-gray-400
               outline-none
+              text-sm sm:text-base
               ${className}
             `}
             {...props}
@@ -90,7 +91,7 @@ export default function AnimatedInput({
 
           {/* Suffix */}
           {suffix && (
-            <div className="pr-4 text-gray-400">
+            <div className="pr-3 sm:pr-4 text-gray-400 text-sm sm:text-base">
               {suffix}
             </div>
           )}
@@ -112,10 +113,10 @@ export default function AnimatedInput({
           <motion.p
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-2 text-sm text-red-400 flex items-center gap-1"
+            className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-red-400 flex items-center gap-1"
           >
             <svg
-              className="w-4 h-4"
+              className="w-3 h-3 sm:w-4 sm:h-4"
               fill="currentColor"
               viewBox="0 0 20 20"
             >

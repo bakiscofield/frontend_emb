@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import { Bell, BellOff, Loader2, Check, AlertCircle } from 'lucide-react';
+import NotificationUnblockGuide from './NotificationUnblockGuide';
 
 export default function NotificationSettings() {
   const {
@@ -97,9 +98,8 @@ export default function NotificationSettings() {
             </p>
 
             {permission === 'denied' && (
-              <div className="mt-3 text-sm text-red-300 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                <AlertCircle className="w-4 h-4 inline mr-2" />
-                Les notifications sont bloquées. Autorisez-les dans les paramètres de votre navigateur.
+              <div className="mt-4">
+                <NotificationUnblockGuide compact />
               </div>
             )}
 

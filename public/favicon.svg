@@ -1,11 +1,3 @@
-<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="32" height="32" rx="6" fill="#2563eb"/>
-
-  <!-- Icon design - Simplified EMB -->
-  <g transform="translate(16, 16)">
-    <!-- Exchange arrows -->
-    <path d="M -7 -5 L 5 -5 L 5 -7 L 9 -4 L 5 -1 L 5 -3 L -7 -3 Z" fill="#fbbf24"/>
-    <path d="M 7 5 L -5 5 L -5 7 L -9 4 L -5 1 L -5 3 L 7 3 Z" fill="#10b981"/>
-  </g>
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <image width="32" height="32" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAADHUlEQVR4nO2VXYhVVRTHf+u/9j0zEw4jldKXRWmR6ESpkIOjh4vzWTPlBBN+VI4jOZZ5s9FACxn6fOjBiCIqol6iCIKkl0goiSB6iB56j3zIHiKht6CXE/vMvnK43SwKJOL+Ye299t7r7v0//7X2vtBBBx38x2CAWswu5uF/tWZtrDrfGt9u7UIH1Ppxn3L3iWjgU5CtbrNp6+b/SiXFJoSQSzop6Zi7P1Vzf0bSE5I+DCFsTLE9wEpgFXAJ0FuZX5LmeirzkdjVwOq01hahZCE9Kun+6E+Ds2hxfq+kg8nfY9LnSDOS5szs6/IUs5fN7FVQA2kvRL/E9Wb6ArNngZuqH9yOQKOWCHy3cUv/9wP5tujXpFlJj6SYfSadZlGtXSb96O5TpvKQF5CORmKYvZn2XonpS6QGsLSiyh8JIA6u6OmZK6Z33vrTYL79l831b4uJeyaB7VkIjURgv0kfE8JmSQ+XXy59FXsUjiItID2I2QfAemDATKeR9gFXXFAB4MCGvr4jxejE/M+b8kO/Dta/KYbGTwD3doXFFFCrrUc6jjQbVSCETbjfAawDhoER4DakxzB7jhC2IM0jPQ7c2FSgABUVJUKzBpop+CHPJ84Mb31rka9mgnTgvKQwBPQDg6nwrgKuAVbEnKd+DXAtcHvK/QBwM+5b6eKG1lSEspEOATuL/O3us5MjZ2demnxv+LP7Gn3Le+eB/UmBW8zsFUm7TToF2mVmTytKjw6b2UngmJm9IekhM3tH0gNm9r673y3TR3G9GB1dd65eX/OnRViMjU39Nj5yOBXhnrhZir0s5h73ETN7N+bbzE6AvQh6MpIrx9IRzF4TOg6sjbHl2xJ/A7PF2J27z9WHdrQQCPPmHq/Pqm4Y6M96x6Pk5v568xYA3amYlsKSZVmWRXmXAZdCV3wb+lI61kL3dcDlcesQwoYsy2INLAeuXMjzUBTF+RR42bhPy72IFqRPTPq0OXb3u6qxLTlsfZKraPtEFwsLqhJoohYfHYvVK82la/Z8zGGbg5umv+HTMr5of27/CCEqkfqq30EHHXTw/8XvRzmHFSTlMU0AAAAASUVORK5CYII="/>
 </svg>

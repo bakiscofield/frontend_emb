@@ -12,6 +12,7 @@ interface TransactionSuccessModalProps {
   totalAmount: number;
   fromMethod: string;
   toMethod: string;
+  hideFromMethod?: boolean;
 }
 
 export default function TransactionSuccessModal({
@@ -21,7 +22,8 @@ export default function TransactionSuccessModal({
   amount,
   totalAmount,
   fromMethod,
-  toMethod
+  toMethod,
+  hideFromMethod = false
 }: TransactionSuccessModalProps) {
   const [progress, setProgress] = useState(0);
 
@@ -144,15 +146,21 @@ export default function TransactionSuccessModal({
                     <span className="text-white font-mono text-xs sm:text-sm font-semibold">{transactionId}</span>
                   </div>
 
-                  <div className="flex items-center justify-center gap-2 sm:gap-3 py-2 sm:py-3">
-                    <div className="flex-1 text-center">
-                      <div className="text-red-400 font-semibold text-sm sm:text-base">{fromMethod}</div>
+                  {!hideFromMethod ? (
+                    <div className="flex items-center justify-center gap-2 sm:gap-3 py-2 sm:py-3">
+                      <div className="flex-1 text-center">
+                        <div className="text-red-400 font-semibold text-sm sm:text-base">{fromMethod}</div>
+                      </div>
+                      <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 flex-shrink-0" />
+                      <div className="flex-1 text-center">
+                        <div className="text-green-400 font-semibold text-sm sm:text-base">{toMethod}</div>
+                      </div>
                     </div>
-                    <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 flex-shrink-0" />
-                    <div className="flex-1 text-center">
-                      <div className="text-green-400 font-semibold text-sm sm:text-base">{toMethod}</div>
+                  ) : (
+                    <div className="flex items-center justify-center py-2 sm:py-3">
+                      <div className="text-green-400 font-semibold text-base sm:text-lg">{toMethod}</div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="border-t border-gray-700 pt-3 sm:pt-4 space-y-2">
                     <div className="flex items-center justify-between">

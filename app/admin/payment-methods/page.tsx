@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { paymentMethodsAPI } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
+import { getApiUrl } from '@/lib/config';
 import GlassCard from '@/components/GlassCard';
 import NeonButton from '@/components/NeonButton';
 import AnimatedInput from '@/components/AnimatedInput';
@@ -17,6 +18,7 @@ interface PaymentMethod {
   name: string;
   code: string;
   icon: string;
+  logo_url?: string;
   description: string;
   is_active: boolean;
   created_at: string;
@@ -32,8 +34,12 @@ export default function PaymentMethodsPage() {
     name: '',
     code: '',
     icon: '',
+    logo_url: '',
     description: ''
   });
+  const [logoMode, setLogoMode] = useState<'url' | 'file'>('url');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
@@ -56,17 +62,37 @@ export default function PaymentMethodsPage() {
     e.preventDefault();
 
     try {
+      let finalFormData = { ...formData };
+
+      // Si un fichier a été sélectionné, l'uploader d'abord
+      if (logoFile && logoMode === 'file') {
+        setUploading(true);
+        try {
+          const uploadResponse = await paymentMethodsAPI.uploadLogo(logoFile);
+          // Utiliser l'URL du fichier uploadé
+          finalFormData.logo_url = uploadResponse.data.data.url;
+          toast.success('Logo uploadé avec succès');
+        } catch (uploadError: any) {
+          toast.error(uploadError.response?.data?.message || 'Erreur lors de l\'upload du logo');
+          setUploading(false);
+          return;
+        }
+        setUploading(false);
+      }
+
       if (editingMethod) {
-        await paymentMethodsAPI.update(editingMethod.id.toString(), formData);
+        await paymentMethodsAPI.update(editingMethod.id.toString(), finalFormData);
         toast.success('Moyen de paiement mis à jour');
       } else {
-        await paymentMethodsAPI.create(formData);
+        await paymentMethodsAPI.create(finalFormData);
         toast.success('Moyen de paiement créé');
       }
 
       setIsModalOpen(false);
       setEditingMethod(null);
-      setFormData({ name: '', code: '', icon: '', description: '' });
+      setFormData({ name: '', code: '', icon: '', logo_url: '', description: '' });
+      setLogoFile(null);
+      setLogoMode('url');
       fetchMethods();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Une erreur est survenue');
@@ -79,6 +105,7 @@ export default function PaymentMethodsPage() {
       name: method.name,
       code: method.code,
       icon: method.icon || '',
+      logo_url: method.logo_url || '',
       description: method.description || ''
     });
     setIsModalOpen(true);
@@ -155,7 +182,9 @@ export default function PaymentMethodsPage() {
             variant="primary"
             onClick={() => {
               setEditingMethod(null);
-              setFormData({ name: '', code: '', icon: '', description: '' });
+              setFormData({ name: '', code: '', icon: '', logo_url: '', description: '' });
+              setLogoFile(null);
+              setLogoMode('url');
               setIsModalOpen(true);
             }}
           >
@@ -178,7 +207,22 @@ export default function PaymentMethodsPage() {
             >
               <div className="flex items-start justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="text-3xl sm:text-4xl">{method.icon || '💰'}</div>
+                  {method.logo_url ? (
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center bg-white/10 rounded-lg overflow-hidden flex-shrink-0">
+                      <img
+                        src={method.logo_url.startsWith('http') ? method.logo_url : `${getApiUrl()}${method.logo_url}`}
+                        alt={method.name}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          // En cas d'erreur de chargement, afficher l'emoji
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = `<div class="text-3xl sm:text-4xl">${method.icon || '💰'}</div>`;
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-3xl sm:text-4xl">{method.icon || '💰'}</div>
+                  )}
                   <div>
                     <h3 className="text-lg sm:text-xl font-semibold text-white">
                       {method.name}
@@ -266,6 +310,74 @@ export default function PaymentMethodsPage() {
                   onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
                 />
 
+                {/* Choix entre URL et fichier */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-300">
+                    Logo (optionnel)
+                  </label>
+
+                  {/* Boutons de sélection du mode */}
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoMode('url');
+                        setLogoFile(null);
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        logoMode === 'url'
+                          ? 'bg-emile-red text-white'
+                          : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoMode('file');
+                        setFormData({ ...formData, logo_url: '' });
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        logoMode === 'file'
+                          ? 'bg-emile-red text-white'
+                          : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      Fichier
+                    </button>
+                  </div>
+
+                  {/* Input selon le mode sélectionné */}
+                  {logoMode === 'url' ? (
+                    <AnimatedInput
+                      placeholder="Ex: https://example.com/logo.png"
+                      value={formData.logo_url}
+                      onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                      type="url"
+                    />
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emile-red file:text-white hover:file:bg-emile-red/80 cursor-pointer"
+                      />
+                      {logoFile && (
+                        <p className="mt-2 text-xs text-gray-400">
+                          Fichier sélectionné: {logoFile.name}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <AnimatedInput
                   label="Description"
                   placeholder="Ex: Togocom Mobile Money"
@@ -278,8 +390,11 @@ export default function PaymentMethodsPage() {
                     type="submit"
                     variant="primary"
                     fullWidth
+                    disabled={uploading}
                   >
-                    <span className="text-sm sm:text-base">{editingMethod ? 'Mettre à jour' : 'Créer'}</span>
+                    <span className="text-sm sm:text-base">
+                      {uploading ? 'Upload en cours...' : (editingMethod ? 'Mettre à jour' : 'Créer')}
+                    </span>
                   </NeonButton>
                   <NeonButton
                     type="button"

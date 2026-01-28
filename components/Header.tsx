@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck, FileText, Settings as SettingsIcon } from 'lucide-react';
+import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck, FileText, Settings as SettingsIcon, Tag } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import VerifiedBadge from './VerifiedBadge';
@@ -202,6 +202,18 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
               >
                 <FileCheck className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">KYC</span>
+              </button>
+              <button
+                onClick={() => router.push('/admin/promo-codes')}
+                className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
+                  pathname === '/admin/promo-codes'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200'
+                }`}
+                title="Codes Promo"
+              >
+                <Tag className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Codes Promo</span>
               </button>
               <button
                 onClick={() => router.push('/admin/settings')}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, History, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { exchangePairsAPI, transactionsAPI, settingsAPI } from '@/lib/api';
+import { exchangePairsAPI, transactionsAPI, settingsAPI, promoCodesAPI } from '@/lib/api';
 import GlassCard from '@/components/GlassCard';
 import NeonButton from '@/components/NeonButton';
 import AnimatedInput from '@/components/AnimatedInput';
@@ -16,6 +16,9 @@ import TransactionSuccessModal from '@/components/TransactionSuccessModal';
 import ProfileModal from '@/components/ProfileModal';
 import ChatWidget from '@/components/ChatWidget';
 import AutoPushNotifications from '@/components/AutoPushNotifications';
+import PromoCodeModal from '@/components/PromoCodeModal';
+import CardOrderForm from '@/components/CardOrderForm';
+import MoneyTransferForm from '@/components/MoneyTransferForm';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/lib/store';
 
@@ -93,7 +96,9 @@ export default function DashboardPage() {
     totalAmount: number;
     fromMethod: string;
     toMethod: string;
+    isCardOrder?: boolean;
   } | null>(null);
+  const [showKycReminder, setShowKycReminder] = useState(true);
 
   const [formData, setFormData] = useState({
     from_number: '',
@@ -101,6 +106,7 @@ export default function DashboardPage() {
     amount: '',
     payment_reference: '',
     notes: '',
+    promo_code: '',
     dynamic_fields: {} as Record<string, any>
   });
 
@@ -118,6 +124,16 @@ export default function DashboardPage() {
     has_kyc: boolean;
     message: string;
   } | null>(null);
+  const [showPromoField, setShowPromoField] = useState(false);
+  const [promoCodeDiscount, setPromoCodeDiscount] = useState<number | null>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [activePromoCode, setActivePromoCode] = useState<{
+    code: string;
+    discount_percent: number;
+    valid_until: string;
+  } | null>(null);
 
   useEffect(() => {
     initAuth();
@@ -134,14 +150,51 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Vérifier si on doit afficher le rappel KYC (une fois par semaine)
+  useEffect(() => {
+    const lastKycReminder = localStorage.getItem('lastKycReminder');
+    if (lastKycReminder) {
+      const now = new Date().getTime();
+      const oneWeek = 7 * 24 * 60 * 60 * 1000; // 7 jours en millisecondes
+      const shouldShow = (now - parseInt(lastKycReminder)) > oneWeek;
+      setShowKycReminder(shouldShow);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchPairs();
       fetchTransactions();
       fetchSettings();
       fetchMonthlyLimit();
+      fetchActivePromoCodes();
     }
   }, [isAuthenticated]);
+
+  const fetchActivePromoCodes = async () => {
+    try {
+      const response = await promoCodesAPI.getMyPromoCodes();
+      if (response.data.success && response.data.promo_codes && response.data.promo_codes.length > 0) {
+        const promo = response.data.promo_codes[0];
+        setActivePromoCode({
+          code: promo.code,
+          discount_percent: promo.discount_percent,
+          valid_until: promo.valid_until
+        });
+
+        // Vérifier si le modal a déjà été affiché pour ce code
+        const shownPromos = JSON.parse(localStorage.getItem('shown_promos') || '[]');
+        if (!shownPromos.includes(promo.code)) {
+          setShowPromoModal(true);
+          // Marquer comme affiché
+          shownPromos.push(promo.code);
+          localStorage.setItem('shown_promos', JSON.stringify(shownPromos));
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des codes promo:', error);
+    }
+  };
 
   // Fonction pour passer à l'étape 2 et préparer les infos de paiement
   const goToStep2 = () => {
@@ -202,9 +255,26 @@ export default function DashboardPage() {
   const calculateTotal = () => {
     if (!selectedPair || !formData.amount) return 0;
     const amount = parseFloat(formData.amount);
-    const fee = (amount * selectedPair.fee_percentage) / 100;
+
+    // Si un code promo est validé, il REMPLACE le pourcentage de frais
+    // Sinon, on utilise le pourcentage de frais de la paire
+    const feePercentage = (promoCodeDiscount !== null && promoCodeDiscount >= 0)
+      ? promoCodeDiscount
+      : selectedPair.fee_percentage;
+
+    const fee = (amount * feePercentage) / 100;
     const tax = selectedPair.tax_amount;
-    return amount + fee + tax;
+    const total = amount + fee + tax;
+
+    return total;
+  };
+
+  // Fonction pour obtenir le pourcentage de frais actuel (avec ou sans promo)
+  const getCurrentFeePercentage = () => {
+    if (!selectedPair) return 0;
+    return (promoCodeDiscount !== null && promoCodeDiscount >= 0)
+      ? promoCodeDiscount
+      : selectedPair.fee_percentage;
   };
 
   const handleViewSyntax = (skipValidation = false) => {
@@ -247,6 +317,33 @@ export default function DashboardPage() {
       return false;
     } finally {
       setIsCheckingReference(false);
+    }
+  };
+
+  const validatePromoCode = async (code: string) => {
+    if (!code || code.trim() === '') {
+      setPromoCodeDiscount(null);
+      setPromoError(null);
+      return;
+    }
+
+    setIsValidatingPromo(true);
+    setPromoError(null);
+
+    try {
+      const response = await promoCodesAPI.validate(code.trim());
+      if (response.data.success && response.data.promo_code) {
+        setPromoCodeDiscount(response.data.promo_code.discount_percent);
+        setPromoError(null);
+        toast.success(`Code promo appliqué! Réduction de ${response.data.promo_code.discount_percent}%`);
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Code promo invalide';
+      setPromoCodeDiscount(null);
+      setPromoError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsValidatingPromo(false);
     }
   };
 
@@ -303,6 +400,7 @@ export default function DashboardPage() {
         amount,
         payment_reference: paymentReference,
         notes: formData.notes || null,
+        promo_code: formData.promo_code || null,
         dynamic_fields: formData.dynamic_fields
       });
 
@@ -313,7 +411,8 @@ export default function DashboardPage() {
         amount,
         totalAmount: calculateTotal(),
         fromMethod: selectedPair?.from_method_name || '',
-        toMethod: selectedPair?.to_method_name || ''
+        toMethod: selectedPair?.to_method_name || '',
+        isCardOrder: selectedPair?.category === 'card_order' || selectedPair?.category === 'money_transfer'
       });
 
       // Pour les liens, afficher d'abord le modal avec le lien, puis le modal de succès
@@ -340,8 +439,12 @@ export default function DashboardPage() {
         amount: '',
         payment_reference: '',
         notes: '',
+        promo_code: '',
         dynamic_fields: {}
       });
+      setShowPromoField(false);
+      setPromoCodeDiscount(null);
+      setPromoError(null);
       fetchTransactions();
       fetchMonthlyLimit(); // Rafraîchir les informations de limite
     } catch (error: any) {
@@ -439,46 +542,46 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-6 sm:mb-8"
             >
-              <GlassCard className={`p-4 sm:p-6 border-2 ${
+              <GlassCard className={`p-2 sm:p-6 border sm:border-2 ${
                 monthlyLimitInfo.has_kyc
                   ? 'border-green-500/30 bg-gradient-to-r from-green-900/10 to-emerald-900/10'
                   : 'border-yellow-500/30 bg-gradient-to-r from-yellow-900/10 to-orange-900/10'
               }`}>
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <div className={`p-2 sm:p-3 rounded-lg flex-shrink-0 ${
+                <div className="flex items-start gap-2 sm:gap-4">
+                  <div className={`p-1.5 sm:p-3 rounded-lg flex-shrink-0 ${
                     monthlyLimitInfo.has_kyc ? 'bg-green-500/20' : 'bg-yellow-500/20'
                   }`}>
-                    <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${
+                    <svg className={`w-4 h-4 sm:w-6 sm:h-6 ${
                       monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
                     }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className={`text-base sm:text-lg font-bold mb-2 ${
+                    <h3 className={`text-xs sm:text-lg font-bold mb-1 sm:mb-2 ${
                       monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
                     }`}>
                       {monthlyLimitInfo.has_kyc ? 'Limite mensuelle (KYC validé)' : 'Limite mensuelle'}
                     </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-sm sm:text-base">
-                        <span className="text-gray-300">Utilisé ce mois:</span>
+                    <div className="space-y-1 sm:space-y-2">
+                      <div className="flex justify-between items-center text-[10px] sm:text-base">
+                        <span className="text-gray-300">Utilisé:</span>
                         <span className="font-bold text-white">{monthlyLimitInfo.current_total.toLocaleString()} FCFA</span>
                       </div>
                       {monthlyLimitInfo.limit && (
                         <>
-                          <div className="flex justify-between items-center text-sm sm:text-base">
-                            <span className="text-gray-300">Limite mensuelle:</span>
+                          <div className="flex justify-between items-center text-[10px] sm:text-base">
+                            <span className="text-gray-300">Limite:</span>
                             <span className="font-bold text-white">{monthlyLimitInfo.limit.toLocaleString()} FCFA</span>
                           </div>
-                          <div className="flex justify-between items-center text-sm sm:text-base">
+                          <div className="flex justify-between items-center text-[10px] sm:text-base">
                             <span className="text-gray-300">Restant:</span>
                             <span className="font-bold text-green-400">{monthlyLimitInfo.remaining?.toLocaleString()} FCFA</span>
                           </div>
                           {/* Progress Bar */}
-                          <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
+                          <div className="w-full bg-gray-700 rounded-full h-1 sm:h-2 mt-1.5 sm:mt-3">
                             <div
-                              className={`h-2 rounded-full transition-all ${
+                              className={`h-1 sm:h-2 rounded-full transition-all ${
                                 ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 80
                                   ? 'bg-red-500'
                                   : ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 50
@@ -491,13 +594,25 @@ export default function DashboardPage() {
                         </>
                       )}
                     </div>
-                    {!monthlyLimitInfo.has_kyc && (
-                      <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p className="text-xs sm:text-sm text-blue-300">
-                          💡 <strong>Validez votre KYC</strong> pour augmenter votre limite mensuelle !
+                    {!monthlyLimitInfo.has_kyc && showKycReminder && (
+                      <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg relative">
+                        <button
+                          onClick={() => {
+                            setShowKycReminder(false);
+                            localStorage.setItem('lastKycReminder', new Date().getTime().toString());
+                          }}
+                          className="absolute top-1 right-1 sm:top-2 sm:right-2 text-blue-300 hover:text-blue-200 transition-colors"
+                          aria-label="Fermer"
+                        >
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        <p className="text-[9px] sm:text-sm text-blue-300 pr-4 sm:pr-6">
+                          💡 <strong>Validez votre KYC</strong> pour augmenter votre limite !
                           <button
                             onClick={() => router.push('/dashboard/kyc')}
-                            className="ml-2 underline hover:text-blue-200 transition-colors"
+                            className="block sm:inline sm:ml-2 mt-1 sm:mt-0 underline hover:text-blue-200 transition-colors text-[9px] sm:text-sm"
                           >
                             Compléter mon KYC →
                           </button>
@@ -526,6 +641,9 @@ export default function DashboardPage() {
               setHasViewedSyntax(false);
               setLastShownAmount(null);
               setCurrentStep(1);
+              setShowPromoField(false);
+              setPromoCodeDiscount(null);
+              setPromoError(null);
             }}
             fullWidth
           >
@@ -553,6 +671,8 @@ export default function DashboardPage() {
                   credit: { title: 'Crédits de communication', icon: '📱', pairs: [] as ExchangePair[], gradient: 'from-blue-600 to-blue-400' },
                   subscription: { title: 'Abonnements', icon: '📺', pairs: [] as ExchangePair[], gradient: 'from-pink-600 to-pink-400' },
                   purchase: { title: 'Achats', icon: '⚡', pairs: [] as ExchangePair[], gradient: 'from-yellow-600 to-yellow-400' },
+                  money_transfer: { title: 'Transferts d\'argent', icon: '💸', pairs: [] as ExchangePair[], gradient: 'from-orange-600 to-orange-400' },
+                  card_order: { title: 'Commande de carte', icon: '💳', pairs: [] as ExchangePair[], gradient: 'from-red-600 to-red-400' },
                   bank_service: { title: 'Services bancaires', icon: '🏦', pairs: [] as ExchangePair[], gradient: 'from-green-600 to-green-400' },
                   other: { title: 'Autres services', icon: '📋', pairs: [] as ExchangePair[], gradient: 'from-gray-600 to-gray-400' }
                 };
@@ -636,6 +756,8 @@ export default function DashboardPage() {
                   credit: { title: 'Crédits de communication', icon: '📱' },
                   subscription: { title: 'Abonnements', icon: '📺' },
                   purchase: { title: 'Achats', icon: '⚡' },
+                  money_transfer: { title: 'Transferts d\'argent', icon: '💸' },
+                  card_order: { title: 'Commande de carte', icon: '💳' },
                   bank_service: { title: 'Services bancaires', icon: '🏦' },
                   other: { title: 'Autres services', icon: '📋' }
                 };
@@ -671,33 +793,62 @@ export default function DashboardPage() {
                             setHasViewedSyntax(false);
                             setLastShownAmount(null);
                             setCurrentStep(1);
+                            setShowPromoField(false);
+                            setPromoCodeDiscount(null);
+                            setPromoError(null);
                           }}
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: index * 0.1 }}
                         >
-                          <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                            <span className="text-4xl sm:text-5xl">{pair.from_method_icon}</span>
-                            <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-emile-red animate-pulse" />
-                            <span className="text-4xl sm:text-5xl">{pair.to_method_icon}</span>
-                          </div>
+                          {pair.category === 'card_order' || pair.category === 'money_transfer' ? (
+                            // Pour les commandes de carte et transferts d'argent, afficher seulement la destination
+                            <>
+                              <div className="flex items-center justify-center mb-3 sm:mb-4">
+                                <span className="text-5xl sm:text-6xl">{pair.to_method_icon}</span>
+                              </div>
 
-                          <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
-                            {pair.from_method_name} → {pair.to_method_name}
-                          </h3>
+                              <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
+                                {pair.to_method_name}
+                              </h3>
+                            </>
+                          ) : (
+                            // Pour les autres types, afficher source → destination
+                            <>
+                              <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                                <span className="text-4xl sm:text-5xl">{pair.from_method_icon}</span>
+                                <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-emile-red animate-pulse" />
+                                <span className="text-4xl sm:text-5xl">{pair.to_method_icon}</span>
+                              </div>
+
+                              <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
+                                {pair.from_method_name} → {pair.to_method_name}
+                              </h3>
+                            </>
+                          )}
 
                           <div className="space-y-1 sm:space-y-2 text-center">
-                            <div className="text-xs sm:text-sm text-gray-300">
-                              Frais: <span className="text-emile-red font-bold">{pair.fee_percentage}%</span>
-                            </div>
-                            {pair.tax_amount > 0 && (
+                            {pair.category === 'card_order' ? (
+                              // Pour les commandes de carte, afficher le prix fixe
                               <div className="text-xs sm:text-sm text-gray-300">
-                                Taxe: <span className="text-emile-red font-bold">{pair.tax_amount} FCFA</span>
+                                Prix fixe: <span className="text-emile-red font-bold">{pair.min_amount || 15000} FCFA</span>
                               </div>
+                            ) : (
+                              // Pour les autres types, afficher frais et montants
+                              <>
+                                <div className="text-xs sm:text-sm text-gray-300">
+                                  Frais: <span className="text-emile-red font-bold">{pair.fee_percentage}%</span>
+                                </div>
+                                {pair.tax_amount > 0 && (
+                                  <div className="text-xs sm:text-sm text-gray-300">
+                                    Taxe: <span className="text-emile-red font-bold">{pair.tax_amount} FCFA</span>
+                                  </div>
+                                )}
+                                <div className="text-xs sm:text-sm text-gray-300">
+                                  Montants: <span className="text-emile-green font-bold">{pair.min_amount || 500} - {pair.max_amount || 500000} FCFA</span>
+                                </div>
+                              </>
                             )}
-                            <div className="text-xs sm:text-sm text-gray-300">
-                              Montants: <span className="text-emile-green font-bold">{pair.min_amount || 500} - {pair.max_amount || 500000} FCFA</span>
-                            </div>
                           </div>
                         </motion.div>
                       ))}
@@ -716,7 +867,100 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <div className="card-emile max-w-2xl mx-auto p-4 sm:p-6 md:p-8">
+              {/* Formulaire spécial pour commande de carte */}
+              {selectedPair.category === 'card_order' ? (
+                <CardOrderForm
+                  fields={selectedPair.fields || []}
+                  onSubmit={async (dynamicFields) => {
+                    setLoading(true);
+                    try {
+                      const response = await transactionsAPI.create({
+                        exchange_pair_id: selectedPair.id,
+                        from_number: 'N/A',
+                        to_number: 'N/A',
+                        amount: selectedPair.min_amount || 15000,
+                        payment_reference: 'CARD_ORDER',
+                        notes: null,
+                        promo_code: null,
+                        dynamic_fields: dynamicFields
+                      });
+
+                      const transactionId = response.data.transaction?.transaction_id || 'N/A';
+                      setSuccessTransactionData({
+                        transactionId,
+                        amount: selectedPair.min_amount || 15000,
+                        totalAmount: selectedPair.min_amount || 15000,
+                        fromMethod: selectedPair.from_method_name || '',
+                        toMethod: selectedPair.to_method_name || '',
+                        isCardOrder: true
+                      });
+
+                      setShowSuccessModal(true);
+                      setSelectedPair(null);
+                      setSelectedCategory(null);
+                      fetchTransactions();
+                      fetchMonthlyLimit();
+                    } catch (error: any) {
+                      const errorMessage = error.response?.data?.message || 'Une erreur est survenue';
+                      toast.error(errorMessage);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onCancel={() => {
+                    setSelectedPair(null);
+                    setSelectedCategory(null);
+                  }}
+                  loading={loading}
+                />
+              ) : selectedPair.category === 'money_transfer' ? (
+                <MoneyTransferForm
+                  fields={selectedPair.fields || []}
+                  serviceName={selectedPair.to_method_name || 'Transfert d\'argent'}
+                  onSubmit={async (dynamicFields) => {
+                    setLoading(true);
+                    try {
+                      const response = await transactionsAPI.create({
+                        exchange_pair_id: selectedPair.id,
+                        from_number: 'N/A',
+                        to_number: 'N/A',
+                        amount: dynamicFields.send_amount || dynamicFields.withdrawal_amount || 1000,
+                        payment_reference: 'MONEY_TRANSFER',
+                        notes: null,
+                        promo_code: null,
+                        dynamic_fields: dynamicFields
+                      });
+
+                      const transactionId = response.data.transaction?.transaction_id || 'N/A';
+                      setSuccessTransactionData({
+                        transactionId,
+                        amount: dynamicFields.send_amount || dynamicFields.withdrawal_amount || 1000,
+                        totalAmount: dynamicFields.send_amount || dynamicFields.withdrawal_amount || 1000,
+                        fromMethod: selectedPair.from_method_name || '',
+                        toMethod: selectedPair.to_method_name || '',
+                        isCardOrder: true
+                      });
+
+                      setShowSuccessModal(true);
+                      setSelectedPair(null);
+                      setSelectedCategory(null);
+                      fetchTransactions();
+                      fetchMonthlyLimit();
+                    } catch (error: any) {
+                      const errorMessage = error.response?.data?.message || 'Une erreur est survenue';
+                      toast.error(errorMessage);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  onCancel={() => {
+                    setSelectedPair(null);
+                    setSelectedCategory(null);
+                  }}
+                  loading={loading}
+                />
+              ) : (
+                <div className="card-emile max-w-2xl mx-auto p-4 sm:p-6 md:p-8">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <div className="flex items-center gap-2 sm:gap-4">
                     <span className="text-3xl sm:text-4xl">{selectedPair.from_method_icon}</span>
@@ -730,6 +974,9 @@ export default function DashboardPage() {
                       setHasViewedSyntax(false);
                       setLastShownAmount(null);
                       setCurrentStep(1);
+                      setShowPromoField(false);
+                      setPromoCodeDiscount(null);
+                      setPromoError(null);
                     }}
                     className="text-gray-400 hover:text-white text-xl sm:text-2xl p-2 -m-2"
                   >
@@ -847,6 +1094,79 @@ export default function DashboardPage() {
                         suffix="FCFA"
                       />
 
+                      {/* Code Promo - Bouton pour afficher */}
+                      {!showPromoField ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowPromoField(true)}
+                          className="w-full py-3 px-4 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-2 border-purple-500/30 hover:border-purple-500/50 text-purple-300 hover:text-purple-200 rounded-lg transition-all flex items-center justify-center gap-2 group"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          <span className="font-semibold">J'ai un code promo</span>
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-gray-200">
+                              Code Promo
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowPromoField(false);
+                                setFormData({ ...formData, promo_code: '' });
+                                setPromoCodeDiscount(null);
+                                setPromoError(null);
+                              }}
+                              className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                          <AnimatedInput
+                            type="text"
+                            placeholder="Ex: PROMO2025"
+                            value={formData.promo_code}
+                            onChange={(e) => {
+                              setFormData({ ...formData, promo_code: e.target.value.toUpperCase() });
+                              setPromoError(null);
+                            }}
+                            onBlur={(e) => {
+                              if (e.target.value.trim()) {
+                                validatePromoCode(e.target.value.trim());
+                              }
+                            }}
+                          />
+                          {isValidatingPromo && (
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Validation du code promo...
+                            </div>
+                          )}
+                          {promoError && (
+                            <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg flex items-start gap-2">
+                              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <p className="text-sm text-red-400">{promoError}</p>
+                            </div>
+                          )}
+                          {promoCodeDiscount && promoCodeDiscount > 0 && !promoError && (
+                            <div className="p-3 bg-green-900/30 border border-green-500/50 rounded-lg flex items-start gap-2">
+                              <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <p className="text-sm text-green-400">Code promo valide! Réduction de {promoCodeDiscount}% appliquée</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Dynamic Fields */}
                       {selectedPair.fields?.map((field) => {
                     if (field.field_type === 'select' && field.options) {
@@ -905,6 +1225,54 @@ export default function DashboardPage() {
                       />
                     );
                   })}
+
+                      {/* Récapitulatif du montant */}
+                      {formData.amount && parseFloat(formData.amount) > 0 && (
+                        <div className="bg-gray-900/50 border-2 border-gray-700 rounded-xl p-4 space-y-2">
+                          <h4 className="text-sm font-semibold text-gray-300 mb-3">Récapitulatif</h4>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Montant:</span>
+                            <span className="text-white font-semibold">{parseFloat(formData.amount).toLocaleString()} FCFA</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            {promoCodeDiscount !== null && promoCodeDiscount >= 0 ? (
+                              <>
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-gray-500 line-through text-xs">Frais ({selectedPair.fee_percentage}%): {((parseFloat(formData.amount) * selectedPair.fee_percentage) / 100).toLocaleString()} FCFA</span>
+                                  <span className="text-green-400">Frais avec promo ({promoCodeDiscount}%):</span>
+                                </div>
+                                <span className="text-green-400 font-semibold">{((parseFloat(formData.amount) * promoCodeDiscount) / 100).toLocaleString()} FCFA</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-gray-400">Frais ({selectedPair.fee_percentage}%):</span>
+                                <span className="text-white font-semibold">{((parseFloat(formData.amount) * selectedPair.fee_percentage) / 100).toLocaleString()} FCFA</span>
+                              </>
+                            )}
+                          </div>
+                          {selectedPair.tax_amount > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Taxe:</span>
+                              <span className="text-white font-semibold">{selectedPair.tax_amount.toLocaleString()} FCFA</span>
+                            </div>
+                          )}
+                          {promoCodeDiscount !== null && promoCodeDiscount >= 0 && (
+                            <div className="p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
+                              <p className="text-xs text-green-400 flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Code promo appliqué! Économie: {((parseFloat(formData.amount) * (selectedPair.fee_percentage - promoCodeDiscount)) / 100).toLocaleString()} FCFA
+                              </p>
+                            </div>
+                          )}
+                          <div className="border-t border-gray-700 pt-2"></div>
+                          <div className="flex justify-between text-base">
+                            <span className="text-white font-bold">Total à payer:</span>
+                            <span className="text-emile-red font-bold text-lg">{calculateTotal().toLocaleString()} FCFA</span>
+                          </div>
+                        </div>
+                      )}
 
                       <button type="submit" className="btn-emile-primary w-full">
                         <span className="text-sm sm:text-base">Continuer →</span>
@@ -1108,6 +1476,7 @@ export default function DashboardPage() {
                   )}
                 </form>
               </div>
+              )}
             </motion.div>
           )}
 
@@ -1213,6 +1582,7 @@ export default function DashboardPage() {
           totalAmount={successTransactionData.totalAmount}
           fromMethod={successTransactionData.fromMethod}
           toMethod={successTransactionData.toMethod}
+          hideFromMethod={successTransactionData.isCardOrder}
         />
       )}
 
@@ -1238,6 +1608,15 @@ export default function DashboardPage() {
 
       {/* Activation automatique des notifications push */}
       <AutoPushNotifications />
+
+      {/* Modal Promo Code */}
+      {activePromoCode && (
+        <PromoCodeModal
+          isOpen={showPromoModal}
+          onClose={() => setShowPromoModal(false)}
+          promoCode={activePromoCode}
+        />
+      )}
     </>
   );
 }

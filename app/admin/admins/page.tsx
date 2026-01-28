@@ -37,7 +37,7 @@ export default function AdminManagement() {
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ username: '', password: '', email: '' });
+  const [newAdmin, setNewAdmin] = useState({ username: '', email: '' });
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -100,16 +100,16 @@ export default function AdminManagement() {
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newAdmin.password.length < 8) {
-      toast.error('Le mot de passe doit contenir au moins 8 caractères');
+    if (!newAdmin.email) {
+      toast.error('L\'email est requis');
       return;
     }
 
     try {
       await adminAPI.createAdmin(newAdmin);
-      toast.success('Administrateur créé');
+      toast.success('Administrateur créé ! Les identifiants ont été envoyés par email.');
       setShowCreateModal(false);
-      setNewAdmin({ username: '', password: '', email: '' });
+      setNewAdmin({ username: '', email: '' });
       fetchAdmins();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur');
@@ -357,25 +357,15 @@ export default function AdminManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-1.5 sm:mb-2 font-medium text-sm sm:text-base">Email (optionnel)</label>
+                  <label className="block text-gray-300 mb-1.5 sm:mb-2 font-medium text-sm sm:text-base">Email</label>
                   <input
                     type="email"
+                    required
                     value={newAdmin.email}
                     onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-red-500 focus:outline-none"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-1.5 sm:mb-2 font-medium text-sm sm:text-base">Mot de passe</label>
-                  <input
-                    type="password"
-                    required
-                    value={newAdmin.password}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-red-500 focus:outline-none"
-                  />
-                  <p className="text-gray-400 text-xs sm:text-sm mt-1">Minimum 8 caractères</p>
+                  <p className="text-gray-400 text-xs sm:text-sm mt-1">Un mot de passe sera généré automatiquement et envoyé à cette adresse</p>
                 </div>
 
                 <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
@@ -389,7 +379,7 @@ export default function AdminManagement() {
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
-                      setNewAdmin({ username: '', password: '', email: '' });
+                      setNewAdmin({ username: '', email: '' });
                     }}
                     className="flex-1 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold"
                   >

@@ -97,7 +97,7 @@ export default function AutoPushNotifications() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-md animate-slide-up">
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-cyan-500/30 rounded-2xl shadow-2xl p-5 backdrop-blur-sm">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-cyan-500/30 rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
         {/* Close button */}
         <button
           onClick={handleDecline}
@@ -108,37 +108,58 @@ export default function AutoPushNotifications() {
 
         {/* Icon */}
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-cyan-500/20 rounded-xl border border-cyan-500/30">
-            <Bell className="w-6 h-6 text-cyan-400" />
+          <div className="p-4 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl border border-cyan-500/30 shadow-lg">
+            <Bell className="w-8 h-8 text-cyan-400" />
           </div>
 
           <div className="flex-1 pr-6">
-            <h3 className="text-white font-semibold text-lg mb-1">
-              Restez informé en temps réel
+            <h3 className="text-white font-bold text-xl mb-2">
+              Ne ratez plus aucune transaction
             </h3>
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Recevez des notifications instantanées sur vos transactions : validations, rejets et mises à jour.
+            <p className="text-gray-300 text-sm leading-relaxed mb-3">
+              Soyez averti instantanément :
             </p>
 
+            {/* Bénéfices clairs */}
+            <ul className="space-y-2 mb-4">
+              <li className="flex items-center gap-2 text-sm">
+                <span className="text-green-400">✓</span>
+                <span className="text-gray-200">Validation de vos transactions</span>
+              </li>
+              <li className="flex items-center gap-2 text-sm">
+                <span className="text-green-400">✓</span>
+                <span className="text-gray-200">Alertes de sécurité importantes</span>
+              </li>
+              <li className="flex items-center gap-2 text-sm">
+                <span className="text-green-400">✓</span>
+                <span className="text-gray-200">Mises à jour de vos opérations</span>
+              </li>
+            </ul>
+
+            {/* Boutons avec CTA fort */}
             <div className="flex gap-3 mt-4">
               <button
                 onClick={handleAccept}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-medium rounded-lg transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
+                className="flex-1 px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 transform hover:scale-105"
               >
-                <Bell className="w-4 h-4" />
-                Activer
+                <Bell className="w-5 h-5" />
+                Activer maintenant
               </button>
               <button
                 onClick={handleDecline}
-                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-lg transition-all"
+                className="px-4 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 font-medium rounded-xl transition-all text-sm"
               >
                 Plus tard
               </button>
             </div>
 
-            <p className="text-xs text-gray-500 mt-3">
-              Vous pouvez modifier ce choix à tout moment dans vos paramètres
-            </p>
+            {/* Réassurance */}
+            <div className="flex items-center gap-2 mt-4 p-2 bg-gray-800/50 rounded-lg">
+              <span className="text-xl">🔒</span>
+              <p className="text-xs text-gray-400">
+                Gratuit • Désactivable à tout moment • Aucun spam
+              </p>
+            </div>
           </div>
         </div>
       </div>

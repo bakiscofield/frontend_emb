@@ -125,6 +125,15 @@ export const paymentMethodsAPI = {
   create: (data: any) => api.post('/payment-methods', data),
   update: (id: string, data: any) => api.put(`/payment-methods/${id}`, data),
   delete: (id: string) => api.delete(`/payment-methods/${id}`),
+  uploadLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return api.post('/payment-methods/upload-logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 // Exchange Pairs
@@ -236,6 +245,16 @@ export const emailTemplatesAPI = {
   create: (data: any) => api.post('/email-templates', data),
   update: (id: string, data: any) => api.put(`/email-templates/${id}`, data),
   delete: (id: string) => api.delete(`/email-templates/${id}`),
+};
+
+// Promo Codes
+export const promoCodesAPI = {
+  getAll: () => api.get('/promo-codes'),
+  getMyPromoCodes: () => api.get('/promo-codes/my-codes'),
+  create: (data: any) => api.post('/promo-codes', data),
+  toggle: (id: string) => api.patch(`/promo-codes/${id}/toggle`),
+  delete: (id: string) => api.delete(`/promo-codes/${id}`),
+  validate: (code: string) => api.post('/promo-codes/validate', { code }),
 };
 
 export default api;
