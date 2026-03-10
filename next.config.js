@@ -10,8 +10,8 @@ const nextConfig = {
   // SWC Minification (plus rapide que Terser)
   swcMinify: true,
 
-  // Output standalone pour réduire la taille
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Output standard (pas standalone pour garder _next/static accessible)
+  // output: 'standalone',
 
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
