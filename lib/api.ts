@@ -99,8 +99,13 @@ export const transactionsAPI = {
   getMyTransactions: () => api.get('/transactions/my-transactions'),
   getTransaction: (id: string) => api.get(`/transactions/${id}`),
   getAllTransactions: (params?: any) => api.get('/transactions', { params }),
+  getMyAssignedTransactions: (params?: any) => api.get('/transactions', { params: { ...params, assigned_to_me: true } }),
+  getMyAcceptedTransactions: (params?: any) => api.get('/transactions', { params: { ...params, accepted_by_me: true } }),
+  acceptAssignment: (id: string) => api.put(`/transactions/${id}/accept`),
   validateTransaction: (id: string, data: any) => api.put(`/transactions/${id}/validate`, data),
+  refuseTransaction: (id: string) => api.put(`/transactions/${id}/refuse`),
   getStats: () => api.get('/transactions/stats/overview'),
+  getDetailedStats: (params?: any) => api.get('/transactions/stats/detailed', { params }),
   checkReference: (reference: string) => api.get(`/transactions/check-reference/${reference}`),
   getMonthlyLimit: () => api.get('/transactions/monthly-limit'),
 };
@@ -157,6 +162,7 @@ export const notificationsAPI = {
 // Permissions
 export const permissionsAPI = {
   getAll: () => api.get('/permissions'),
+  getMyPermissions: () => api.get('/admin/my-permissions'),
   getAdminPermissions: (adminId: string) => api.get(`/permissions/admin/${adminId}`),
   grantPermission: (adminId: string, permissionId: number) =>
     api.post(`/permissions/admin/${adminId}/grant`, { permissionId }),
@@ -226,14 +232,34 @@ export const chatAPI = {
   // Routes utilisateur
   getConversation: () => api.get('/chat/conversation'),
   getMessages: (conversationId: string) => api.get(`/chat/messages/${conversationId}`),
-  sendMessage: (conversationId: string, message: string) =>
-    api.post('/chat/message', { conversation_id: conversationId, message }),
+  sendMessage: (conversationId: string, message: string, file?: File) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append('conversation_id', conversationId);
+      formData.append('message', message);
+      formData.append('file', file);
+      return api.post('/chat/message', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/chat/message', { conversation_id: conversationId, message });
+  },
 
   // Routes admin
   getAllConversations: (status?: string) => api.get('/chat/admin/conversations', { params: { status } }),
   getConversationById: (id: string) => api.get(`/chat/admin/conversation/${id}`),
-  sendAdminMessage: (conversationId: string, message: string) =>
-    api.post('/chat/admin/message', { conversation_id: conversationId, message }),
+  sendAdminMessage: (conversationId: string, message: string, file?: File) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append('conversation_id', conversationId);
+      formData.append('message', message);
+      formData.append('file', file);
+      return api.post('/chat/admin/message', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/chat/admin/message', { conversation_id: conversationId, message });
+  },
   closeConversation: (id: string) => api.post(`/chat/admin/close/${id}`),
   reopenConversation: (id: string) => api.post(`/chat/admin/reopen/${id}`),
 };
@@ -245,6 +271,31 @@ export const emailTemplatesAPI = {
   create: (data: any) => api.post('/email-templates', data),
   update: (id: string, data: any) => api.put(`/email-templates/${id}`, data),
   delete: (id: string) => api.delete(`/email-templates/${id}`),
+};
+
+// Points de Vente
+export const pointsDeVenteAPI = {
+  getActive: () => api.get('/points-de-vente'),
+  getAll: () => api.get('/points-de-vente/all'),
+  create: (data: any) => api.post('/points-de-vente', data),
+  update: (id: string, data: any) => api.put(`/points-de-vente/${id}`, data),
+  delete: (id: string) => api.delete(`/points-de-vente/${id}`),
+  getAgents: (id: string) => api.get(`/points-de-vente/${id}/agents`),
+  assignAgent: (id: string, adminId: number) => api.post(`/points-de-vente/${id}/agents`, { admin_id: adminId }),
+  removeAgent: (id: string, adminId: string) => api.delete(`/points-de-vente/${id}/agents/${adminId}`),
+};
+
+// Commissions
+export const commissionAPI = {
+  getBalance: () => api.get('/admin/commission/balance'),
+  getHistory: (params?: any) => api.get('/admin/commission/history', { params }),
+  withdraw: (amount: number, network: string, phone_number: string) => api.post('/admin/commission/withdraw', { amount, network, phone_number }),
+  getAllBalances: () => api.get('/admin/commission/all'),
+  getAdminHistory: (adminId: string, params?: any) => api.get(`/admin/commission/history/${adminId}`, { params }),
+  getWithdrawalRequests: () => api.get('/admin/commission/withdrawal-requests'),
+  getAllWithdrawalRequests: (status?: string) => api.get('/admin/commission/all-withdrawal-requests', { params: { status } }),
+  approveWithdrawal: (id: number) => api.patch(`/admin/commission/withdrawal-requests/${id}/approve`),
+  rejectWithdrawal: (id: number, reason?: string) => api.patch(`/admin/commission/withdrawal-requests/${id}/reject`, { reason }),
 };
 
 // Promo Codes

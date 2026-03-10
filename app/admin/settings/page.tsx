@@ -35,7 +35,7 @@ interface ConfigItem {
 
 export default function AdminSettingsPage() {
   const router = useRouter();
-  const { admin, isAdmin, isAuthenticated, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, isAuthenticated, logoutAdmin, hasAnyPermission } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'emails' | 'general'>('emails');
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
@@ -59,10 +59,15 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       router.push('/admin/login');
-    } else {
-      loadTemplates();
-      loadConfigs();
+      return;
     }
+    if (!hasAnyPermission('MANAGE_CONFIG', 'MANAGE_BOOKMAKERS')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
+      return;
+    }
+    loadTemplates();
+    loadConfigs();
   }, [isAuthenticated, isAdmin, router]);
 
   const loadTemplates = async () => {
@@ -234,6 +239,7 @@ export default function AdminSettingsPage() {
         userName={admin?.username}
         onLogout={logoutAdmin}
         showAdminNav={true}
+        adminPermissions={admin?.permissions || []}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

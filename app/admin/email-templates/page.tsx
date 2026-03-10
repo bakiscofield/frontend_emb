@@ -24,7 +24,7 @@ interface EmailTemplate {
 
 export default function EmailTemplatesPage() {
   const router = useRouter();
-  const { token, admin, logoutAdmin } = useAuthStore();
+  const { token, admin, logoutAdmin, hasPermission, hasAnyPermission } = useAuthStore();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,6 +34,7 @@ export default function EmailTemplatesPage() {
   const [previewHtml, setPreviewHtml] = useState('');
   const [testEmail, setTestEmail] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     type: '',
@@ -46,6 +47,10 @@ export default function EmailTemplatesPage() {
   });
 
   useEffect(() => {
+    if (!hasAnyPermission('VIEW_EMAIL_TEMPLATES', 'MANAGE_EMAIL_TEMPLATES')) {
+      router.push('/admin/dashboard');
+      return;
+    }
     fetchTemplates();
   }, []);
 
@@ -72,6 +77,7 @@ export default function EmailTemplatesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setSubmitting(true);
     try {
       if (editingTemplate) {
         // Update
@@ -100,6 +106,8 @@ export default function EmailTemplatesPage() {
     } catch (error: any) {
       console.error('Erreur lors de la sauvegarde:', error);
       toast.error(error.response?.data?.message || 'Erreur lors de la sauvegarde');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -224,6 +232,7 @@ export default function EmailTemplatesPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin?.permissions || []}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 sm:p-6 lg:p-8">
@@ -237,6 +246,7 @@ export default function EmailTemplatesPage() {
               </h1>
               <p className="text-gray-400">Gérez les templates d'emails envoyés aux utilisateurs</p>
             </div>
+            {hasPermission('MANAGE_EMAIL_TEMPLATES') && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -246,6 +256,7 @@ export default function EmailTemplatesPage() {
               <Plus className="w-5 h-5" />
               Nouveau Template
             </motion.button>
+            )}
           </div>
         </div>
 
@@ -292,6 +303,8 @@ export default function EmailTemplatesPage() {
                 <Eye className="w-4 h-4" />
                 Aperçu
               </button>
+              {hasPermission('MANAGE_EMAIL_TEMPLATES') && (
+              <>
               <button
                 onClick={() => {
                   setEditingTemplate(template);
@@ -316,6 +329,8 @@ export default function EmailTemplatesPage() {
                 <Trash2 className="w-4 h-4" />
                 Supprimer
               </button>
+              </>
+              )}
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
@@ -457,10 +472,15 @@ export default function EmailTemplatesPage() {
                 <div className="flex gap-4 pt-4 border-t border-gray-700">
                   <button
                     type="submit"
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-lg font-medium transition-all"
+                    disabled={submitting}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Save className="w-5 h-5" />
-                    {editingTemplate ? 'Mettre à jour' : 'Créer'}
+                    {submitting ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Save className="w-5 h-5" />
+                    )}
+                    {submitting ? 'En cours...' : (editingTemplate ? 'Mettre à jour' : 'Créer')}
                   </button>
                   <button
                     type="button"

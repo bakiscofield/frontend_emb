@@ -52,11 +52,12 @@ interface UserOption {
 
 export default function PromoCodesPage() {
   const router = useRouter();
-  const { admin, isAdmin, isAuthenticated, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, isAuthenticated, logoutAdmin, hasPermission, hasAnyPermission } = useAuthStore();
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<PromoCode | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     discount_percent: '',
@@ -69,6 +70,10 @@ export default function PromoCodesPage() {
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasAnyPermission('VIEW_PROMO_CODES', 'MANAGE_PROMO_CODES')) {
+      router.push('/admin/dashboard');
       return;
     }
     fetchPromoCodes();
@@ -96,6 +101,7 @@ export default function PromoCodesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setSubmitting(true);
     try {
       const payload = {
         code: formData.code.toUpperCase(),
@@ -122,6 +128,8 @@ export default function PromoCodesPage() {
       fetchPromoCodes();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Une erreur est survenue');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -172,6 +180,7 @@ export default function PromoCodesPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin.permissions || []}
       />
 
       <div className="min-h-screen p-3 sm:p-6 relative">
@@ -243,6 +252,7 @@ export default function PromoCodesPage() {
           </div>
 
           {/* Add Button */}
+          {hasPermission('MANAGE_PROMO_CODES') && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -267,6 +277,7 @@ export default function PromoCodesPage() {
               <span className="text-sm sm:text-base">Créer un code promo</span>
             </NeonButton>
           </motion.div>
+          )}
 
           {/* Promo Codes List */}
           {promoCodes.length === 0 ? (
@@ -309,6 +320,7 @@ export default function PromoCodesPage() {
                           </span>
                         </div>
                       </div>
+                      {hasPermission('MANAGE_PROMO_CODES') ? (
                       <button
                         onClick={() => toggleActive(promoCode)}
                         className="transition-transform hover:scale-110 flex-shrink-0"
@@ -320,6 +332,13 @@ export default function PromoCodesPage() {
                           <XCircle className="w-6 h-6 sm:w-7 sm:h-7 text-emile-red" />
                         )}
                       </button>
+                      ) : (
+                        promoCode.is_active && !expired ? (
+                          <CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 text-emile-green" />
+                        ) : (
+                          <XCircle className="w-6 h-6 sm:w-7 sm:h-7 text-emile-red" />
+                        )
+                      )}
                     </div>
 
                     {/* Status Badges */}
@@ -401,6 +420,7 @@ export default function PromoCodesPage() {
                     </div>
 
                     {/* Actions */}
+                    {hasPermission('MANAGE_PROMO_CODES') && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleDelete(promoCode.id)}
@@ -411,6 +431,7 @@ export default function PromoCodesPage() {
                         <span className="xs:hidden">Supp.</span>
                       </button>
                     </div>
+                    )}
                   </GlassCard>
                 );
               })}
@@ -529,6 +550,8 @@ export default function PromoCodesPage() {
                       type="submit"
                       variant="primary"
                       fullWidth
+                      loading={submitting}
+                      disabled={submitting}
                     >
                       <span className="text-sm sm:text-base">Créer le code promo</span>
                     </NeonButton>

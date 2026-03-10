@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, History, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { exchangePairsAPI, transactionsAPI, settingsAPI, promoCodesAPI } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
 import GlassCard from '@/components/GlassCard';
 import NeonButton from '@/components/NeonButton';
 import AnimatedInput from '@/components/AnimatedInput';
@@ -26,8 +27,10 @@ interface ExchangePair {
   id: number;
   from_method_name: string;
   from_method_icon: string;
+  from_method_logo_url?: string;
   to_method_name: string;
   to_method_icon: string;
+  to_method_logo_url?: string;
   fee_percentage: number;
   tax_amount: number;
   min_amount: number;
@@ -72,6 +75,39 @@ interface Transaction {
   created_at: string;
 }
 
+// Composant pour afficher le logo ou l'emoji d'un moyen de paiement
+function PaymentIcon({ icon, logoUrl, size = 'md' }: { icon: string; logoUrl?: string; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClasses = {
+    sm: 'w-8 h-8 sm:w-10 sm:h-10',
+    md: 'w-10 h-10 sm:w-12 sm:h-12',
+    lg: 'w-12 h-12 sm:w-14 sm:h-14'
+  };
+  const textSizes = {
+    sm: 'text-2xl sm:text-3xl',
+    md: 'text-3xl sm:text-4xl',
+    lg: 'text-4xl sm:text-5xl'
+  };
+
+  if (logoUrl) {
+    const src = logoUrl.startsWith('http') ? logoUrl : `${getApiUrl()}${logoUrl}`;
+    return (
+      <div className={`${sizeClasses[size]} flex items-center justify-center bg-white/10 rounded-lg overflow-hidden flex-shrink-0`}>
+        <img
+          src={src}
+          alt=""
+          className="w-full h-full object-contain"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            e.currentTarget.parentElement!.innerHTML = `<span class="${textSizes[size]}">${icon || '💰'}</span>`;
+          }}
+        />
+      </div>
+    );
+  }
+
+  return <span className={textSizes[size]}>{icon || '💰'}</span>;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, logout, initAuth } = useAuthStore();
@@ -109,6 +145,11 @@ export default function DashboardPage() {
     promo_code: '',
     dynamic_fields: {} as Record<string, any>
   });
+  const [pdvData, setPdvData] = useState<{
+    pointDeVenteId: number | null;
+    clientLatitude: number | null;
+    clientLongitude: number | null;
+  }>({ pointDeVenteId: null, clientLatitude: null, clientLongitude: null });
 
   const [minAmount, setMinAmount] = useState(500);
   const [maxAmount, setMaxAmount] = useState(500000);
@@ -200,6 +241,23 @@ export default function DashboardPage() {
   const goToStep2 = () => {
     if (!selectedPair) return;
 
+    // Valider les champs de l'étape 1
+    if (!formData.from_number || !formData.from_number.trim()) {
+      toast.error(`Veuillez entrer votre numéro ${selectedPair.from_method_name}`);
+      return;
+    }
+
+    const needsToNumber = selectedPair.category !== 'subscription' || selectedPair.show_to_number !== false;
+    if (needsToNumber && (!formData.to_number || !formData.to_number.trim())) {
+      toast.error(`Veuillez entrer le numéro ${selectedPair.to_method_name} de destination`);
+      return;
+    }
+
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      toast.error('Veuillez entrer un montant valide');
+      return;
+    }
+
     const total = calculateTotal();
     setPaymentInfo({
       syntaxType: selectedPair.payment_syntax_type || 'TEXTE',
@@ -256,25 +314,27 @@ export default function DashboardPage() {
     if (!selectedPair || !formData.amount) return 0;
     const amount = parseFloat(formData.amount);
 
-    // Si un code promo est validé, il REMPLACE le pourcentage de frais
-    // Sinon, on utilise le pourcentage de frais de la paire
-    const feePercentage = (promoCodeDiscount !== null && promoCodeDiscount >= 0)
-      ? promoCodeDiscount
-      : selectedPair.fee_percentage;
-
-    const fee = (amount * feePercentage) / 100;
+    const fee = (amount * selectedPair.fee_percentage) / 100;
     const tax = selectedPair.tax_amount;
-    const total = amount + fee + tax;
+    let total = amount + fee + tax;
 
-    return total;
+    // Appliquer la réduction promo sur le total (même calcul que le backend)
+    if (promoCodeDiscount !== null && promoCodeDiscount > 0) {
+      const discount = (total * promoCodeDiscount) / 100;
+      total = total - discount;
+    }
+
+    return Math.round(total);
   };
 
-  // Fonction pour obtenir le pourcentage de frais actuel (avec ou sans promo)
-  const getCurrentFeePercentage = () => {
-    if (!selectedPair) return 0;
-    return (promoCodeDiscount !== null && promoCodeDiscount >= 0)
-      ? promoCodeDiscount
-      : selectedPair.fee_percentage;
+  // Calcul du montant de la réduction promo
+  const getPromoDiscountAmount = () => {
+    if (!selectedPair || !formData.amount || promoCodeDiscount === null || promoCodeDiscount <= 0) return 0;
+    const amount = parseFloat(formData.amount);
+    const fee = (amount * selectedPair.fee_percentage) / 100;
+    const tax = selectedPair.tax_amount;
+    const totalBeforeDiscount = amount + fee + tax;
+    return Math.round((totalBeforeDiscount * promoCodeDiscount) / 100);
   };
 
   const handleViewSyntax = (skipValidation = false) => {
@@ -350,6 +410,20 @@ export default function DashboardPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Vérifier les numéros source et destination
+    if (!formData.from_number || !formData.from_number.trim()) {
+      toast.error('Veuillez entrer le numéro source');
+      setCurrentStep(1);
+      return;
+    }
+
+    const needsToNumber = selectedPair?.category !== 'subscription' || selectedPair?.show_to_number !== false;
+    if (needsToNumber && (!formData.to_number || !formData.to_number.trim())) {
+      toast.error('Veuillez entrer le numéro de destination');
+      setCurrentStep(1);
+      return;
+    }
+
     const amount = parseFloat(formData.amount);
     // Utiliser les montants de la paire sélectionnée ou les valeurs par défaut
     const currentMinAmount = selectedPair?.min_amount || minAmount;
@@ -388,6 +462,8 @@ export default function DashboardPage() {
         ? formData.from_number
         : formData.to_number;
 
+      console.log('[DEBUG] Submitting transaction:', { from_number: formData.from_number, to_number: toNumber, amount, exchange_pair_id: selectedPair?.id });
+
       // Déterminer la référence de paiement
       const paymentReference = (selectedPair?.category !== 'subscription' || selectedPair?.reference_required !== false) && formData.payment_reference
         ? formData.payment_reference
@@ -401,7 +477,10 @@ export default function DashboardPage() {
         payment_reference: paymentReference,
         notes: formData.notes || null,
         promo_code: formData.promo_code || null,
-        dynamic_fields: formData.dynamic_fields
+        dynamic_fields: formData.dynamic_fields,
+        point_de_vente_id: pdvData.pointDeVenteId,
+        client_latitude: pdvData.clientLatitude,
+        client_longitude: pdvData.clientLongitude
       });
 
       // Préparer les données pour le modal de succès
@@ -430,6 +509,7 @@ export default function DashboardPage() {
       }
 
       setSelectedPair(null);
+      setPdvData({ pointDeVenteId: null, clientLatitude: null, clientLongitude: null });
       setHasViewedSyntax(false);
       setLastShownAmount(null);
       setCurrentStep(1);
@@ -535,95 +615,7 @@ export default function DashboardPage() {
             )}
           </AnimatePresence>
 
-          {/* Monthly Limit Info */}
-          {monthlyLimitInfo && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6 sm:mb-8"
-            >
-              <GlassCard className={`p-2 sm:p-6 border sm:border-2 ${
-                monthlyLimitInfo.has_kyc
-                  ? 'border-green-500/30 bg-gradient-to-r from-green-900/10 to-emerald-900/10'
-                  : 'border-yellow-500/30 bg-gradient-to-r from-yellow-900/10 to-orange-900/10'
-              }`}>
-                <div className="flex items-start gap-2 sm:gap-4">
-                  <div className={`p-1.5 sm:p-3 rounded-lg flex-shrink-0 ${
-                    monthlyLimitInfo.has_kyc ? 'bg-green-500/20' : 'bg-yellow-500/20'
-                  }`}>
-                    <svg className={`w-4 h-4 sm:w-6 sm:h-6 ${
-                      monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
-                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`text-xs sm:text-lg font-bold mb-1 sm:mb-2 ${
-                      monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
-                    }`}>
-                      {monthlyLimitInfo.has_kyc ? 'Limite mensuelle (KYC validé)' : 'Limite mensuelle'}
-                    </h3>
-                    <div className="space-y-1 sm:space-y-2">
-                      <div className="flex justify-between items-center text-[10px] sm:text-base">
-                        <span className="text-gray-300">Utilisé:</span>
-                        <span className="font-bold text-white">{monthlyLimitInfo.current_total.toLocaleString()} FCFA</span>
-                      </div>
-                      {monthlyLimitInfo.limit && (
-                        <>
-                          <div className="flex justify-between items-center text-[10px] sm:text-base">
-                            <span className="text-gray-300">Limite:</span>
-                            <span className="font-bold text-white">{monthlyLimitInfo.limit.toLocaleString()} FCFA</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[10px] sm:text-base">
-                            <span className="text-gray-300">Restant:</span>
-                            <span className="font-bold text-green-400">{monthlyLimitInfo.remaining?.toLocaleString()} FCFA</span>
-                          </div>
-                          {/* Progress Bar */}
-                          <div className="w-full bg-gray-700 rounded-full h-1 sm:h-2 mt-1.5 sm:mt-3">
-                            <div
-                              className={`h-1 sm:h-2 rounded-full transition-all ${
-                                ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 80
-                                  ? 'bg-red-500'
-                                  : ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 50
-                                  ? 'bg-yellow-500'
-                                  : 'bg-green-500'
-                              }`}
-                              style={{ width: `${Math.min((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    {!monthlyLimitInfo.has_kyc && showKycReminder && (
-                      <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg relative">
-                        <button
-                          onClick={() => {
-                            setShowKycReminder(false);
-                            localStorage.setItem('lastKycReminder', new Date().getTime().toString());
-                          }}
-                          className="absolute top-1 right-1 sm:top-2 sm:right-2 text-blue-300 hover:text-blue-200 transition-colors"
-                          aria-label="Fermer"
-                        >
-                          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                        <p className="text-[9px] sm:text-sm text-blue-300 pr-4 sm:pr-6">
-                          💡 <strong>Validez votre KYC</strong> pour augmenter votre limite !
-                          <button
-                            onClick={() => router.push('/dashboard/kyc')}
-                            className="block sm:inline sm:ml-2 mt-1 sm:mt-0 underline hover:text-blue-200 transition-colors text-[9px] sm:text-sm"
-                          >
-                            Compléter mon KYC →
-                          </button>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </GlassCard>
-            </motion.div>
-          )}
+          {/* Monthly Limit Info - déplacé dans le ProfileModal */}
 
           {/* Notification Settings - DÉSACTIVÉ */}
           {/* <div className="mb-6 sm:mb-8">
@@ -805,7 +797,7 @@ export default function DashboardPage() {
                             // Pour les commandes de carte et transferts d'argent, afficher seulement la destination
                             <>
                               <div className="flex items-center justify-center mb-3 sm:mb-4">
-                                <span className="text-5xl sm:text-6xl">{pair.to_method_icon}</span>
+                                <PaymentIcon icon={pair.to_method_icon} logoUrl={pair.to_method_logo_url} size="lg" />
                               </div>
 
                               <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
@@ -816,9 +808,9 @@ export default function DashboardPage() {
                             // Pour les autres types, afficher source → destination
                             <>
                               <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                                <span className="text-4xl sm:text-5xl">{pair.from_method_icon}</span>
+                                <PaymentIcon icon={pair.from_method_icon} logoUrl={pair.from_method_logo_url} size="md" />
                                 <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-emile-red animate-pulse" />
-                                <span className="text-4xl sm:text-5xl">{pair.to_method_icon}</span>
+                                <PaymentIcon icon={pair.to_method_icon} logoUrl={pair.to_method_logo_url} size="md" />
                               </div>
 
                               <h3 className="text-lg sm:text-xl font-semibold text-center text-white mb-3 sm:mb-4">
@@ -871,6 +863,7 @@ export default function DashboardPage() {
               {selectedPair.category === 'card_order' ? (
                 <CardOrderForm
                   fields={selectedPair.fields || []}
+                  onPointDeVenteChange={(data) => setPdvData(data)}
                   onSubmit={async (dynamicFields) => {
                     setLoading(true);
                     try {
@@ -882,7 +875,10 @@ export default function DashboardPage() {
                         payment_reference: 'CARD_ORDER',
                         notes: null,
                         promo_code: null,
-                        dynamic_fields: dynamicFields
+                        dynamic_fields: dynamicFields,
+                        point_de_vente_id: pdvData.pointDeVenteId,
+                        client_latitude: pdvData.clientLatitude,
+                        client_longitude: pdvData.clientLongitude
                       });
 
                       const transactionId = response.data.transaction?.transaction_id || 'N/A';
@@ -917,6 +913,7 @@ export default function DashboardPage() {
                 <MoneyTransferForm
                   fields={selectedPair.fields || []}
                   serviceName={selectedPair.to_method_name || 'Transfert d\'argent'}
+                  onPointDeVenteChange={(data) => setPdvData(data)}
                   onSubmit={async (dynamicFields) => {
                     setLoading(true);
                     try {
@@ -924,11 +921,14 @@ export default function DashboardPage() {
                         exchange_pair_id: selectedPair.id,
                         from_number: 'N/A',
                         to_number: 'N/A',
-                        amount: dynamicFields.send_amount || dynamicFields.withdrawal_amount || 1000,
+                        amount: parseFloat(dynamicFields.send_amount) || parseFloat(dynamicFields.withdrawal_amount) || 1000,
                         payment_reference: 'MONEY_TRANSFER',
                         notes: null,
                         promo_code: null,
-                        dynamic_fields: dynamicFields
+                        dynamic_fields: dynamicFields,
+                        point_de_vente_id: pdvData.pointDeVenteId,
+                        client_latitude: pdvData.clientLatitude,
+                        client_longitude: pdvData.clientLongitude
                       });
 
                       const transactionId = response.data.transaction?.transaction_id || 'N/A';
@@ -963,9 +963,9 @@ export default function DashboardPage() {
                 <div className="card-emile max-w-2xl mx-auto p-4 sm:p-6 md:p-8">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <div className="flex items-center gap-2 sm:gap-4">
-                    <span className="text-3xl sm:text-4xl">{selectedPair.from_method_icon}</span>
+                    <PaymentIcon icon={selectedPair.from_method_icon} logoUrl={selectedPair.from_method_logo_url} size="sm" />
                     <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-emile-red" />
-                    <span className="text-3xl sm:text-4xl">{selectedPair.to_method_icon}</span>
+                    <PaymentIcon icon={selectedPair.to_method_icon} logoUrl={selectedPair.to_method_logo_url} size="sm" />
                   </div>
                   <button
                     onClick={() => {
@@ -1235,20 +1235,8 @@ export default function DashboardPage() {
                             <span className="text-white font-semibold">{parseFloat(formData.amount).toLocaleString()} FCFA</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            {promoCodeDiscount !== null && promoCodeDiscount >= 0 ? (
-                              <>
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-gray-500 line-through text-xs">Frais ({selectedPair.fee_percentage}%): {((parseFloat(formData.amount) * selectedPair.fee_percentage) / 100).toLocaleString()} FCFA</span>
-                                  <span className="text-green-400">Frais avec promo ({promoCodeDiscount}%):</span>
-                                </div>
-                                <span className="text-green-400 font-semibold">{((parseFloat(formData.amount) * promoCodeDiscount) / 100).toLocaleString()} FCFA</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-gray-400">Frais ({selectedPair.fee_percentage}%):</span>
-                                <span className="text-white font-semibold">{((parseFloat(formData.amount) * selectedPair.fee_percentage) / 100).toLocaleString()} FCFA</span>
-                              </>
-                            )}
+                            <span className="text-gray-400">Frais ({selectedPair.fee_percentage}%):</span>
+                            <span className="text-white font-semibold">{((parseFloat(formData.amount) * selectedPair.fee_percentage) / 100).toLocaleString()} FCFA</span>
                           </div>
                           {selectedPair.tax_amount > 0 && (
                             <div className="flex justify-between text-sm">
@@ -1256,14 +1244,10 @@ export default function DashboardPage() {
                               <span className="text-white font-semibold">{selectedPair.tax_amount.toLocaleString()} FCFA</span>
                             </div>
                           )}
-                          {promoCodeDiscount !== null && promoCodeDiscount >= 0 && (
-                            <div className="p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
-                              <p className="text-xs text-green-400 flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Code promo appliqué! Économie: {((parseFloat(formData.amount) * (selectedPair.fee_percentage - promoCodeDiscount)) / 100).toLocaleString()} FCFA
-                              </p>
+                          {promoCodeDiscount !== null && promoCodeDiscount > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-400">Réduction promo (-{promoCodeDiscount}%):</span>
+                              <span className="text-green-400 font-semibold">-{getPromoDiscountAmount().toLocaleString()} FCFA</span>
                             </div>
                           )}
                           <div className="border-t border-gray-700 pt-2"></div>
@@ -1391,7 +1375,7 @@ export default function DashboardPage() {
                           </div>
 
                           <div className="text-gray-400 text-xs sm:text-sm">
-                            Le lien s'ouvrira dans un nouvel onglet. Une fois le paiement effectué, votre transaction sera automatiquement validée par un administrateur.
+                            Le lien s'ouvrira dans un nouvel onglet. Une fois le paiement effectué, votre transaction sera automatiquement validée par un agent.
                           </div>
                         </div>
                       )}
@@ -1600,6 +1584,7 @@ export default function DashboardPage() {
             kyc_status: (user.kyc_status as 'pending' | 'approved' | 'rejected') || 'pending'
           }}
           onProfileUpdate={handleProfileUpdate}
+          monthlyLimitInfo={monthlyLimitInfo}
         />
       )}
 

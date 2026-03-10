@@ -59,7 +59,7 @@ interface Stats {
 
 export default function UserManagement() {
   const router = useRouter();
-  const { admin, isAdmin, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, logoutAdmin, hasPermission, hasAnyPermission } = useAuthStore();
 
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -73,10 +73,16 @@ export default function UserManagement() {
   const [showToggleModal, setShowToggleModal] = useState(false);
   const [userToToggle, setUserToToggle] = useState<User | null>(null);
   const [toggleReason, setToggleReason] = useState('');
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasPermission('view_users')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchUsers();
@@ -123,6 +129,7 @@ export default function UserManagement() {
   const confirmToggleActive = async () => {
     if (!userToToggle) return;
 
+    setToggling(true);
     try {
       await usersAPI.toggleActive(userToToggle.id.toString());
       toast.success(`Utilisateur ${userToToggle.is_active ? 'désactivé' : 'activé'}`);
@@ -132,6 +139,8 @@ export default function UserManagement() {
       fetchUsers();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur');
+    } finally {
+      setToggling(false);
     }
   };
 
@@ -190,6 +199,7 @@ export default function UserManagement() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin?.permissions || []}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-3 sm:p-6">
@@ -318,6 +328,7 @@ export default function UserManagement() {
                           </div>
                         )}
                       </div>
+                      {hasPermission('manage_users') && (
                       <div className="flex gap-2 sm:mt-3" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => {
@@ -346,6 +357,7 @@ export default function UserManagement() {
                           {user.newsletter_subscribed ? <Mail className="w-3 h-3" /> : <MailX className="w-3 h-3" />}
                         </button>
                       </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -600,13 +612,21 @@ export default function UserManagement() {
                 </button>
                 <button
                   onClick={confirmToggleActive}
-                  className={`flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg transition-colors ${
+                  disabled={toggling}
+                  className={`flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
                     userToToggle.is_active
                       ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'bg-green-500 hover:bg-green-600 text-white'
                   }`}
                 >
-                  Confirmer
+                  {toggling ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      En cours...
+                    </>
+                  ) : (
+                    'Confirmer'
+                  )}
                 </button>
               </div>
             </div>

@@ -30,7 +30,7 @@ interface SubscriberStats {
 
 export default function NewsletterManagement() {
   const router = useRouter();
-  const { admin, isAdmin, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, logoutAdmin, hasPermission, hasAnyPermission } = useAuthStore();
 
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [stats, setStats] = useState<SubscriberStats | null>(null);
@@ -40,6 +40,8 @@ export default function NewsletterManagement() {
   const [selectedNewsletter, setSelectedNewsletter] = useState<Newsletter | null>(null);
   const [recipientType, setRecipientType] = useState('subscribers');
 
+  const [creating, setCreating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     subject: '',
@@ -50,6 +52,11 @@ export default function NewsletterManagement() {
   useEffect(() => {
     if (!isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasAnyPermission('VIEW_NEWSLETTERS', 'CREATE_NEWSLETTERS')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchNewsletters();
@@ -85,6 +92,7 @@ export default function NewsletterManagement() {
       return;
     }
 
+    setCreating(true);
     try {
       await newslettersAPI.create(formData);
       toast.success('Newsletter créée en tant que brouillon');
@@ -93,12 +101,15 @@ export default function NewsletterManagement() {
       fetchNewsletters();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur');
+    } finally {
+      setCreating(false);
     }
   };
 
   const handleSendNewsletter = async () => {
     if (!selectedNewsletter) return;
 
+    setSending(true);
     try {
       const response = await newslettersAPI.send(
         selectedNewsletter.id.toString(),
@@ -110,6 +121,8 @@ export default function NewsletterManagement() {
       fetchNewsletters();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur lors de l\'envoi');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -163,6 +176,7 @@ export default function NewsletterManagement() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin?.permissions || []}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-3 sm:p-6">
@@ -170,12 +184,14 @@ export default function NewsletterManagement() {
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-white">Gestion des Newsletters</h1>
+            {hasPermission('CREATE_NEWSLETTERS') && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all text-sm sm:text-base"
             >
               + Nouvelle Newsletter
             </button>
+            )}
           </div>
 
         {/* Statistiques */}
@@ -237,6 +253,7 @@ export default function NewsletterManagement() {
                       )}
                     </p>
                   </div>
+                  {hasPermission('CREATE_NEWSLETTERS') && (
                   <div className="flex gap-2 w-full sm:w-auto">
                     {newsletter.status === 'draft' && (
                       <button
@@ -253,6 +270,7 @@ export default function NewsletterManagement() {
                       Supprimer
                     </button>
                   </div>
+                  )}
                 </div>
                 <div className="bg-gray-900/50 rounded-lg p-3 sm:p-4 border border-gray-700">
                   <p className="text-gray-300 text-xs sm:text-sm line-clamp-3">{newsletter.content}</p>
@@ -319,9 +337,17 @@ export default function NewsletterManagement() {
                 <div className="flex flex-col sm:flex-row gap-3 mt-4 sm:mt-6">
                   <button
                     type="submit"
-                    className="flex-1 py-2 sm:py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold text-sm sm:text-base"
+                    disabled={creating}
+                    className="flex-1 py-2 sm:py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Créer en Brouillon
+                    {creating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        En cours...
+                      </>
+                    ) : (
+                      'Créer en Brouillon'
+                    )}
                   </button>
                   <button
                     type="button"
@@ -412,16 +438,25 @@ export default function NewsletterManagement() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleSendNewsletter}
-                  className="flex-1 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all font-semibold text-sm sm:text-base"
+                  disabled={sending}
+                  className="flex-1 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all font-semibold text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Envoyer Maintenant
+                  {sending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    'Envoyer Maintenant'
+                  )}
                 </button>
                 <button
                   onClick={() => {
                     setShowSendModal(false);
                     setSelectedNewsletter(null);
                   }}
-                  className="flex-1 py-2 sm:py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm sm:text-base"
+                  disabled={sending}
+                  className="flex-1 py-2 sm:py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm sm:text-base disabled:opacity-50"
                 >
                   Annuler
                 </button>

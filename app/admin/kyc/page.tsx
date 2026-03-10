@@ -50,7 +50,7 @@ interface Stats {
 
 export default function AdminKYCPage() {
   const router = useRouter();
-  const { admin, isAuthenticated, isAdmin, logoutAdmin, initAuth } = useAuthStore();
+  const { admin, isAuthenticated, isAdmin, logoutAdmin, initAuth, hasPermission, hasAnyPermission } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<KYCDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<KYCDocument[]>([]);
@@ -68,6 +68,11 @@ export default function AdminKYCPage() {
     initAuth();
     if (!isAuthenticated || !isAdmin || !admin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasAnyPermission('VIEW_KYC', 'MANAGE_KYC')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchDocuments();
@@ -224,6 +229,7 @@ export default function AdminKYCPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin.permissions || []}
       >
         <NotificationBell />
       </Header>
@@ -366,7 +372,7 @@ export default function AdminKYCPage() {
                           <div>
                             <span className="text-gray-500">Type de document:</span>
                             <span className="text-white ml-2 font-medium">
-                              {doc.document_type === 'carte_identite' ? 'Carte d\'identité' : 'Passeport'}
+                              {doc.document_type === 'carte_identite' ? 'Carte d\'identité' : doc.document_type === 'national_id' ? 'Carte de nationalité' : 'Passeport'}
                             </span>
                           </div>
                           <div>
@@ -477,7 +483,7 @@ export default function AdminKYCPage() {
                   <FileText className="w-4 h-4 text-gray-400" />
                   <span className="text-gray-400">Type:</span>
                   <span className="text-white font-medium">
-                    {selectedDocument.document_type === 'carte_identite' ? 'Carte d\'identité' : 'Passeport'}
+                    {selectedDocument.document_type === 'carte_identite' ? 'Carte d\'identité' : selectedDocument.document_type === 'national_id' ? 'Carte de nationalité' : 'Passeport'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm sm:text-base">
@@ -539,8 +545,8 @@ export default function AdminKYCPage() {
                 )}
               </div>
 
-              {/* Rejection Reason Input (if pending) */}
-              {selectedDocument.status === 'pending' && (
+              {/* Rejection Reason Input (if pending and has MANAGE_KYC) */}
+              {selectedDocument.status === 'pending' && hasPermission('MANAGE_KYC') && (
                 <div className="mb-6">
                   <label className="block text-sm sm:text-base font-medium text-gray-200 mb-3">
                     Raison du rejet (optionnel pour rejet)
@@ -567,29 +573,27 @@ export default function AdminKYCPage() {
               )}
 
               {/* Action Buttons */}
-              {selectedDocument.status === 'pending' && (
+              {selectedDocument.status === 'pending' && hasPermission('MANAGE_KYC') && (
                 <div className="flex flex-col sm:flex-row gap-3">
                   <NeonButton
                     variant="secondary"
                     fullWidth
                     onClick={handleReject}
                     disabled={actionLoading}
+                    loading={actionLoading}
                   >
                     <XCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    <span className="text-sm sm:text-base">
-                      {actionLoading ? 'Traitement...' : 'Rejeter'}
-                    </span>
+                    <span className="text-sm sm:text-base">Rejeter</span>
                   </NeonButton>
                   <NeonButton
                     variant="primary"
                     fullWidth
                     onClick={handleApprove}
                     disabled={actionLoading}
+                    loading={actionLoading}
                   >
                     <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    <span className="text-sm sm:text-base">
-                      {actionLoading ? 'Traitement...' : 'Approuver'}
-                    </span>
+                    <span className="text-sm sm:text-base">Approuver</span>
                   </NeonButton>
                 </div>
               )}

@@ -129,9 +129,9 @@ export default function LoginPage() {
               </Link>
             </p>
             <p className="text-gray-400 text-xs">
-              Vous êtes administrateur ?{' '}
+              Vous êtes agent ?{' '}
               <Link href="/admin/login" className="text-emile-green hover:text-emile-green-glow font-semibold transition-colors">
-                Connexion admin
+                Connexion agent
               </Link>
             </p>
           </div>

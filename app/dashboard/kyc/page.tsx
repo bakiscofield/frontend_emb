@@ -29,7 +29,7 @@ export default function KYCPage() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState<KYCStatus | null>(null);
-  const [documentType, setDocumentType] = useState('carte_identite');
+  const documentType = 'carte_identite';
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [backFile, setBackFile] = useState<File | null>(null);
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
@@ -90,7 +90,12 @@ export default function KYCPage() {
     e.preventDefault();
 
     if (!frontFile) {
-      toast.error('Veuillez uploader le recto du document');
+      toast.error('Veuillez uploader le recto de la carte d\'identité');
+      return;
+    }
+
+    if (!backFile) {
+      toast.error('Veuillez uploader le verso de la carte d\'identité');
       return;
     }
 
@@ -216,7 +221,7 @@ export default function KYCPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-gray-400 text-sm sm:text-base">Type de document:</span>
                     <span className="text-white font-semibold text-sm sm:text-base">
-                      {kycStatus.document.type === 'carte_identite' ? 'Carte d\'identité' : 'Passeport'}
+                      {kycStatus.document.type === 'carte_identite' ? 'Carte d\'identité' : kycStatus.document.type === 'national_id' ? 'Carte de nationalité' : 'Passeport'}
                     </span>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -258,52 +263,16 @@ export default function KYCPage() {
                 </h2>
 
                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                  {/* Type de document */}
-                  <div>
-                    <label className="block text-sm sm:text-base font-medium text-gray-200 mb-3">
-                      Type de document
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <label className={`flex items-center justify-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        documentType === 'carte_identite'
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-gray-600 hover:border-gray-500'
-                      }`}>
-                        <input
-                          type="radio"
-                          name="documentType"
-                          value="carte_identite"
-                          checked={documentType === 'carte_identite'}
-                          onChange={(e) => setDocumentType(e.target.value)}
-                          className="hidden"
-                        />
-                        <FileText className="w-5 h-5 text-red-400" />
-                        <span className="text-white font-medium text-sm sm:text-base">Carte d'identité</span>
-                      </label>
-
-                      <label className={`flex items-center justify-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        documentType === 'passeport'
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-gray-600 hover:border-gray-500'
-                      }`}>
-                        <input
-                          type="radio"
-                          name="documentType"
-                          value="passeport"
-                          checked={documentType === 'passeport'}
-                          onChange={(e) => setDocumentType(e.target.value)}
-                          className="hidden"
-                        />
-                        <FileText className="w-5 h-5 text-red-400" />
-                        <span className="text-white font-medium text-sm sm:text-base">Passeport</span>
-                      </label>
-                    </div>
+                  {/* Type de document fixe */}
+                  <div className="flex items-center gap-3 p-4 bg-red-500/10 border-2 border-red-500 rounded-lg">
+                    <FileText className="w-5 h-5 text-red-400" />
+                    <span className="text-white font-medium text-sm sm:text-base">Carte d'identité (Recto & Verso)</span>
                   </div>
 
                   {/* Upload Recto */}
                   <div>
                     <label className="block text-sm sm:text-base font-medium text-gray-200 mb-3">
-                      Recto du document <span className="text-red-400">*</span>
+                      Recto de la carte d'identité <span className="text-red-400">*</span>
                     </label>
                     <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 sm:p-6 text-center hover:border-red-500/50 transition-colors">
                       <input
@@ -333,7 +302,7 @@ export default function KYCPage() {
                   {/* Upload Verso */}
                   <div>
                     <label className="block text-sm sm:text-base font-medium text-gray-200 mb-3">
-                      Verso du document {documentType === 'carte_identite' && <span className="text-red-400">*</span>}
+                      Verso de la carte d'identité <span className="text-red-400">*</span>
                     </label>
                     <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 sm:p-6 text-center hover:border-red-500/50 transition-colors">
                       <input
@@ -382,7 +351,7 @@ export default function KYCPage() {
                       type="submit"
                       variant="primary"
                       fullWidth
-                      disabled={loading || !frontFile}
+                      disabled={loading || !frontFile || !backFile}
                     >
                       <span className="text-sm sm:text-base">{loading ? 'Envoi en cours...' : 'Soumettre'}</span>
                     </NeonButton>

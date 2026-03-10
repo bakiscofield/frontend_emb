@@ -14,6 +14,8 @@ interface Admin {
   id: number;
   username: string;
   email?: string;
+  role?: string;
+  permissions?: string[];
 }
 
 interface AuthStore {
@@ -25,6 +27,9 @@ interface AuthStore {
 
   setUser: (user: User, token: string) => void;
   setAdmin: (admin: Admin, token: string) => void;
+  setAdminPermissions: (permissions: string[]) => void;
+  hasPermission: (code: string) => boolean;
+  hasAnyPermission: (...codes: string[]) => boolean;
   logout: () => void;
   logoutAdmin: () => void;
   initAuth: () => void;
@@ -57,6 +62,23 @@ export const useAuthStore = create<AuthStore>()(
           isAdmin: true,
           user: null // Clear user data when admin logs in
         });
+      },
+
+      setAdminPermissions: (permissions) => {
+        const state = get();
+        if (state.admin) {
+          set({ admin: { ...state.admin, permissions } });
+        }
+      },
+
+      hasPermission: (code) => {
+        const state = get();
+        return state.admin?.permissions?.includes(code) ?? false;
+      },
+
+      hasAnyPermission: (...codes) => {
+        const state = get();
+        return codes.some(code => state.admin?.permissions?.includes(code));
       },
 
       logout: () => {

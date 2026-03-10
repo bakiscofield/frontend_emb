@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 import AnimatedInput from './AnimatedInput';
+import PointDeVenteSelector from './PointDeVenteSelector';
 import toast from 'react-hot-toast';
 
 interface Field {
@@ -23,13 +24,15 @@ interface MoneyTransferFormProps {
   onSubmit: (formData: Record<string, any>) => Promise<void>;
   onCancel: () => void;
   loading: boolean;
+  onPointDeVenteChange?: (data: { pointDeVenteId: number | null; clientLatitude: number | null; clientLongitude: number | null }) => void;
 }
 
-export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCancel, loading }: MoneyTransferFormProps) {
+export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCancel, loading, onPointDeVenteChange }: MoneyTransferFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Record<string, any>>({
     transfer_service: serviceName
   });
+  const [selectedPdVId, setSelectedPdVId] = useState<number | null>(null);
 
   // Organisation des champs par étapes
   const stepGroups = {
@@ -46,7 +49,7 @@ export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCan
     3: {
       title: 'Détails de l\'opération',
       icon: '💰',
-      fields: ['send_amount', 'send_currency', 'destination_country', 'beneficiary_name', 'beneficiary_phone', 'mtcn_reference', 'withdrawal_amount', 'withdrawal_currency', 'origin_country']
+      fields: ['send_amount', 'send_currency', 'destination_country', 'beneficiary_name', 'beneficiary_phone', 'mtcn_reference', 'withdrawal_amount', 'origin_country']
     },
     4: {
       title: 'Mode de paiement',
@@ -56,7 +59,7 @@ export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCan
     5: {
       title: 'Pièce d\'identité',
       icon: '🆔',
-      fields: ['id_type', 'id_number', 'id_document']
+      fields: ['id_type', 'id_number']
     },
     6: {
       title: 'Point de vente',
@@ -90,7 +93,7 @@ export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCan
     for (const field of currentFields) {
       // Champs conditionnels basés sur le type d'opération
       const isEnvoiField = ['send_amount', 'send_currency', 'destination_country', 'beneficiary_name', 'beneficiary_phone'].includes(field.field_name);
-      const isRetraitField = ['mtcn_reference', 'withdrawal_amount', 'withdrawal_currency', 'origin_country'].includes(field.field_name);
+      const isRetraitField = ['mtcn_reference', 'withdrawal_amount', 'origin_country'].includes(field.field_name);
 
       // Ignorer les champs conditionnels non applicables
       if (operationType === 'Envoi d\'argent' && isRetraitField) continue;
@@ -135,7 +138,7 @@ export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCan
 
     // Masquer les champs conditionnels selon le type d'opération
     const isEnvoiField = ['send_amount', 'send_currency', 'destination_country', 'beneficiary_name', 'beneficiary_phone'].includes(field.field_name);
-    const isRetraitField = ['mtcn_reference', 'withdrawal_amount', 'withdrawal_currency', 'origin_country'].includes(field.field_name);
+    const isRetraitField = ['mtcn_reference', 'withdrawal_amount', 'origin_country'].includes(field.field_name);
 
     if (operationType === 'Envoi d\'argent' && isRetraitField) return null;
     if (operationType === 'Retrait d\'argent' && isEnvoiField) return null;
@@ -384,7 +387,18 @@ export default function MoneyTransferForm({ fields, serviceName, onSubmit, onCan
           exit={{ opacity: 0, x: -20 }}
           className="space-y-2 sm:space-y-4 md:space-y-6"
         >
-          {getCurrentStepFields().map(renderField)}
+          {currentStep === 6 ? (
+            <PointDeVenteSelector
+              selectedId={selectedPdVId}
+              onSelect={(data) => {
+                setSelectedPdVId(data.pointDeVenteId);
+                setFormData({ ...formData, pickup_point: data.pointDeVenteId ? `PdV-${data.pointDeVenteId}` : '' });
+                onPointDeVenteChange?.(data);
+              }}
+            />
+          ) : (
+            getCurrentStepFields().map(renderField)
+          )}
         </motion.div>
 
         {/* Boutons de navigation */}

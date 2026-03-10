@@ -75,13 +75,14 @@ interface EmailTemplate {
 
 export default function ExchangePairsPage() {
   const router = useRouter();
-  const { admin, isAdmin, isAuthenticated, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, isAuthenticated, logoutAdmin, hasPermission } = useAuthStore();
   const [pairs, setPairs] = useState<ExchangePair[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPair, setEditingPair] = useState<ExchangePair | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     from_method_id: '',
     to_method_id: '',
@@ -116,6 +117,11 @@ export default function ExchangePairsPage() {
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasPermission('MANAGE_EXCHANGE_PAIRS')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchPairs();
@@ -207,7 +213,7 @@ export default function ExchangePairsPage() {
     }
 
     if (parseFloat(formData.fee_percentage) < 0) {
-      errors.push('Le pourcentage de frais doit être supérieur ou égal à 0');
+      errors.push('Le pourcentage de commission doit être supérieur ou égal à 0');
     }
 
     if (parseFloat(formData.tax_amount) < 0) {
@@ -251,6 +257,7 @@ export default function ExchangePairsPage() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const data = {
         from_method_id: parseInt(formData.from_method_id),
@@ -334,6 +341,8 @@ export default function ExchangePairsPage() {
       } else {
         toast.error(error.response?.data?.message || 'Une erreur est survenue lors de la création/modification');
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -511,6 +520,7 @@ export default function ExchangePairsPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin.permissions || []}
       />
 
       <div className="min-h-screen p-3 sm:p-6 relative">
@@ -526,7 +536,7 @@ export default function ExchangePairsPage() {
               Paires d'Échanges
             </h1>
             <p className="text-sm sm:text-base text-gray-400">
-              Configurez les échanges possibles avec frais et champs personnalisés
+              Configurez les échanges possibles avec commissions et champs personnalisés
             </p>
           </motion.div>
 
@@ -586,7 +596,7 @@ export default function ExchangePairsPage() {
 
               <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
                 <div className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-gray-400">Frais:</span>
+                  <span className="text-gray-400">Commission:</span>
                   <span className="text-emile-green font-semibold">
                     {pair.fee_percentage}%
                   </span>
@@ -681,7 +691,7 @@ export default function ExchangePairsPage() {
                 </div>
                 <p className="text-xs text-center text-gray-400">
                   {currentStep === 1 && 'Catégorie et sélection des paires'}
-                  {currentStep === 2 && 'Frais, taxes et montants'}
+                  {currentStep === 2 && 'Commission, taxes et montants'}
                   {currentStep === 3 && 'Syntaxe de paiement et configuration'}
                   {currentStep === 4 && 'Champs personnalisés'}
                 </p>
@@ -778,11 +788,11 @@ export default function ExchangePairsPage() {
                   </div>
                 </div>
 
-                {/* Step 2: Frais, taxes et montants */}
+                {/* Step 2: Commission, taxes et montants */}
                 <div className={`${currentStep !== 2 ? 'hidden sm:block' : ''} space-y-4`}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <AnimatedInput
-                      label="Pourcentage de frais (%)"
+                      label="Pourcentage de commission (%)"
                       type="number"
                       step="0.1"
                       min="0"
@@ -913,7 +923,7 @@ export default function ExchangePairsPage() {
                     />
                     {formData.payment_syntax_type === 'TEXTE' && (
                       <p className="text-xs text-green-500 mt-1">
-                        La variable {'{montant}'} sera automatiquement remplacée par le montant total (montant + frais + taxe)
+                        La variable {'{montant}'} sera automatiquement remplacée par le montant total (montant + commission + taxe)
                       </p>
                     )}
                   </div>
@@ -1235,7 +1245,7 @@ export default function ExchangePairsPage() {
                       <span className="text-sm">Suivant →</span>
                     </NeonButton>
                   ) : (
-                    <NeonButton type="submit" variant="primary" fullWidth>
+                    <NeonButton type="submit" variant="primary" fullWidth loading={submitting} disabled={submitting}>
                       <span className="text-sm">{editingPair ? 'Mettre à jour' : 'Créer'}</span>
                     </NeonButton>
                   )}
@@ -1243,7 +1253,7 @@ export default function ExchangePairsPage() {
 
                 {/* Standard buttons - Desktop (no steps) */}
                 <div className="hidden sm:flex flex-col sm:flex-row gap-3 mt-4 sm:mt-6">
-                  <NeonButton type="submit" variant="primary" fullWidth>
+                  <NeonButton type="submit" variant="primary" fullWidth loading={submitting} disabled={submitting}>
                     <span className="text-sm sm:text-base">{editingPair ? 'Mettre à jour' : 'Créer'}</span>
                   </NeonButton>
                   <NeonButton

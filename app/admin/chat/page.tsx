@@ -13,13 +13,17 @@ import {
   User,
   Mail,
   Phone,
-  Clock
+  Clock,
+  Paperclip,
+  FileText,
+  Download
 } from 'lucide-react';
 import Header from '@/components/Header';
 import NotificationBell from '@/components/NotificationBell';
 import GlassCard from '@/components/GlassCard';
 import NeonButton from '@/components/NeonButton';
 import { chatAPI } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
 import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 
@@ -29,6 +33,9 @@ interface Message {
   sender_type: 'user' | 'admin';
   sender_id: number;
   message: string;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
   is_read: boolean;
   created_at: string;
 }
@@ -51,7 +58,7 @@ interface ConversationDetails extends Conversation {
 
 export default function AdminChatPage() {
   const router = useRouter();
-  const { admin, isAuthenticated, isAdmin, logoutAdmin, initAuth } = useAuthStore();
+  const { admin, isAuthenticated, isAdmin, logoutAdmin, initAuth, hasPermission, hasAnyPermission } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetails | null>(null);
@@ -59,13 +66,21 @@ export default function AdminChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initAuth();
     if (!isAuthenticated || !isAdmin || !admin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasAnyPermission('VIEW_CHAT', 'MANAGE_CHAT')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchConversations();
@@ -84,6 +99,15 @@ export default function AdminChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [selectedConversation?.messages]);
+
+  // Cleanup file preview URL
+  useEffect(() => {
+    return () => {
+      if (filePreview) {
+        URL.revokeObjectURL(filePreview);
+      }
+    };
+  }, [filePreview]);
 
   const fetchConversations = async () => {
     try {
@@ -132,15 +156,46 @@ export default function AdminChatPage() {
     await fetchConversationDetails(conv.id.toString());
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Le fichier est trop volumineux (max 10MB)');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setFilePreview(url);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    if (filePreview) {
+      URL.revokeObjectURL(filePreview);
+      setFilePreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!newMessage.trim() || !selectedConversation) return;
+    if ((!newMessage.trim() && !selectedFile) || !selectedConversation) return;
 
     try {
       setSending(true);
-      await chatAPI.sendAdminMessage(selectedConversation.id.toString(), newMessage.trim());
+      await chatAPI.sendAdminMessage(selectedConversation.id.toString(), newMessage.trim(), selectedFile || undefined);
       setNewMessage('');
+      removeSelectedFile();
       fetchConversationDetails(selectedConversation.id.toString());
       fetchConversations(); // Refresh list
     } catch (error: any) {
@@ -186,6 +241,49 @@ export default function AdminChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const isImageFile = (fileType?: string | null) => {
+    return fileType?.startsWith('image/');
+  };
+
+  const getFileUrl = (fileUrl: string) => {
+    const apiUrl = getApiUrl();
+    return `${apiUrl}${fileUrl}`;
+  };
+
+  const renderFileAttachment = (msg: Message) => {
+    if (!msg.file_url) return null;
+
+    const fullUrl = getFileUrl(msg.file_url);
+    const isAdmin = msg.sender_type === 'admin';
+
+    if (isImageFile(msg.file_type)) {
+      return (
+        <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="block mt-1">
+          <img
+            src={fullUrl}
+            alt={msg.file_name || 'Image'}
+            className="max-w-full max-h-48 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+          />
+        </a>
+      );
+    }
+
+    return (
+      <a
+        href={fullUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex items-center gap-2 mt-1 p-2 rounded-lg transition-colors ${
+          isAdmin ? 'bg-red-700/30 hover:bg-red-700/50' : 'bg-gray-700/50 hover:bg-gray-700/70'
+        }`}
+      >
+        <FileText className="w-4 h-4 flex-shrink-0" />
+        <span className="text-xs truncate flex-1">{msg.file_name || 'Fichier'}</span>
+        <Download className="w-3 h-3 flex-shrink-0" />
+      </a>
+    );
+  };
+
   useEffect(() => {
     fetchConversations();
   }, [activeFilter]);
@@ -205,6 +303,7 @@ export default function AdminChatPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin.permissions || []}
       >
         <NotificationBell />
       </Header>
@@ -357,7 +456,8 @@ export default function AdminChatPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {selectedConversation.status === 'open' ? (
+                        {hasPermission('MANAGE_CHAT') && (
+                        selectedConversation.status === 'open' ? (
                           <NeonButton
                             variant="secondary"
                             onClick={handleCloseConversation}
@@ -377,7 +477,7 @@ export default function AdminChatPage() {
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Réouvrir
                           </NeonButton>
-                        )}
+                        ))}
                         <button
                           onClick={() => setSelectedConversation(null)}
                           className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
@@ -412,7 +512,10 @@ export default function AdminChatPage() {
                                 : 'bg-gray-800 text-gray-100 rounded-bl-none'
                             }`}
                           >
-                            <p className="text-sm break-words">{msg.message}</p>
+                            {renderFileAttachment(msg)}
+                            {msg.message && (
+                              <p className="text-sm break-words">{msg.message}</p>
+                            )}
                             <p
                               className={`text-[10px] mt-1 ${
                                 msg.sender_type === 'admin' ? 'text-red-100/70' : 'text-gray-500'
@@ -432,29 +535,66 @@ export default function AdminChatPage() {
 
                   {/* Input */}
                   {selectedConversation.status === 'open' && (
-                    <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-800">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          placeholder="Écrivez votre message..."
-                          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
-                          disabled={sending}
-                        />
-                        <button
-                          type="submit"
-                          disabled={sending || !newMessage.trim()}
-                          className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                        >
-                          {sending ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Send className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </form>
+                    <>
+                      {/* File Preview */}
+                      {selectedFile && (
+                        <div className="px-4 pt-2 border-t border-gray-800">
+                          <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+                            {filePreview ? (
+                              <img src={filePreview} alt="Preview" className="w-10 h-10 rounded object-cover" />
+                            ) : (
+                              <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                            )}
+                            <span className="text-xs text-gray-300 truncate flex-1">{selectedFile.name}</span>
+                            <button
+                              onClick={removeSelectedFile}
+                              className="p-1 hover:bg-gray-700 rounded transition-colors"
+                            >
+                              <X className="w-4 h-4 text-gray-400" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasPermission('MANAGE_CHAT') && <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-800">
+                        <div className="flex gap-2">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                            disabled={sending}
+                          >
+                            <Paperclip className="w-5 h-5" />
+                          </button>
+                          <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Écrivez votre message..."
+                            className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+                            disabled={sending}
+                          />
+                          <button
+                            type="submit"
+                            disabled={sending || (!newMessage.trim() && !selectedFile)}
+                            className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                          >
+                            {sending ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Send className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </form>}
+                    </>
                   )}
                 </GlassCard>
               ) : (

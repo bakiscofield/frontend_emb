@@ -8,6 +8,14 @@ import { usersAPI, kycAPI } from '@/lib/api';
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications';
 import VerifiedBadge from './VerifiedBadge';
 
+interface MonthlyLimitInfo {
+  current_total: number;
+  limit: number | null;
+  remaining: number | null;
+  has_kyc: boolean;
+  message: string;
+}
+
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,9 +28,10 @@ interface ProfileModalProps {
     kyc_status: 'pending' | 'approved' | 'rejected';
   };
   onProfileUpdate: () => void;
+  monthlyLimitInfo?: MonthlyLimitInfo | null;
 }
 
-export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }: ProfileModalProps) {
+export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate, monthlyLimitInfo }: ProfileModalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'kyc' | 'notifications'>('profile');
   const [loading, setLoading] = useState(false);
   const [kycLoading, setKycLoading] = useState(false);
@@ -50,7 +59,7 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
     frontPreview: string | null;
     backPreview: string | null;
   }>({
-    document_type: 'passport',
+    document_type: 'carte_identite',
     document_front: null,
     document_back: null,
     frontPreview: null,
@@ -122,7 +131,12 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
     e.preventDefault();
 
     if (!kycData.document_front) {
-      toast.error('Veuillez fournir au moins le recto du document');
+      toast.error('Veuillez fournir le recto de la carte d\'identité');
+      return;
+    }
+
+    if (!kycData.document_back) {
+      toast.error('Veuillez fournir le verso de la carte d\'identité');
       return;
     }
 
@@ -141,7 +155,7 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
       toast.success('Documents KYC soumis avec succes. Ils seront verifies sous peu.');
 
       setKycData({
-        document_type: 'passport',
+        document_type: 'carte_identite',
         document_front: null,
         document_back: null,
         frontPreview: null,
@@ -258,6 +272,7 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
 
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
             {activeTab === 'profile' && (
+              <>
               <form onSubmit={handleProfileUpdate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -309,6 +324,69 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
                   {loading ? 'Mise a jour...' : 'Mettre a jour le profil'}
                 </button>
               </form>
+
+              {/* Limite mensuelle */}
+              {monthlyLimitInfo && (
+                <div className={`mt-6 p-4 rounded-lg border ${
+                  monthlyLimitInfo.has_kyc
+                    ? 'border-green-500/30 bg-green-900/10'
+                    : 'border-yellow-500/30 bg-yellow-900/10'
+                }`}>
+                  <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${
+                    monthlyLimitInfo.has_kyc ? 'text-green-400' : 'text-yellow-400'
+                  }`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {monthlyLimitInfo.has_kyc ? 'Limite mensuelle (KYC validé)' : 'Limite mensuelle'}
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300">Utilisé:</span>
+                      <span className="font-bold text-white">{monthlyLimitInfo.current_total.toLocaleString()} FCFA</span>
+                    </div>
+                    {monthlyLimitInfo.limit && (
+                      <>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-300">Limite:</span>
+                          <span className="font-bold text-white">{monthlyLimitInfo.limit.toLocaleString()} FCFA</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-300">Restant:</span>
+                          <span className="font-bold text-green-400">{monthlyLimitInfo.remaining?.toLocaleString()} FCFA</span>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 80
+                                ? 'bg-red-500'
+                                : ((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100) > 50
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min((monthlyLimitInfo.current_total / monthlyLimitInfo.limit) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {!monthlyLimitInfo.has_kyc && (
+                    <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <p className="text-xs text-blue-300">
+                        💡 <strong>Validez votre KYC</strong> pour augmenter votre limite !
+                        <button
+                          onClick={() => setActiveTab('kyc')}
+                          className="ml-2 underline hover:text-blue-200 transition-colors"
+                        >
+                          Compléter mon KYC →
+                        </button>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              </>
             )}
 
             {activeTab === 'kyc' && (
@@ -354,25 +432,15 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
 
                 {(!existingKyc || existingKyc.status === 'rejected') && (
                   <form onSubmit={handleKycSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Type de document
-                      </label>
-                      <select
-                        value={kycData.document_type}
-                        onChange={(e) => setKycData({ ...kycData, document_type: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-red-500"
-                      >
-                        <option value="passport">Passeport</option>
-                        <option value="national_id">Carte d'identite nationale</option>
-                        <option value="driver_license">Permis de conduire</option>
-                      </select>
+                    <div className="flex items-center gap-3 p-3 bg-gray-900/50 border border-gray-600 rounded-lg">
+                      <Shield className="w-5 h-5 text-red-400" />
+                      <span className="text-white font-medium text-sm">Carte d'identité (Recto & Verso)</span>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         <Camera className="w-4 h-4 inline mr-2" />
-                        Recto du document *
+                        Recto de la carte d'identité *
                       </label>
                       <div className="relative">
                         {kycData.frontPreview ? (
@@ -406,48 +474,46 @@ export default function ProfileModal({ isOpen, onClose, user, onProfileUpdate }:
                       </div>
                     </div>
 
-                    {kycData.document_type !== 'passport' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          <Camera className="w-4 h-4 inline mr-2" />
-                          Verso du document
-                        </label>
-                        <div className="relative">
-                          {kycData.backPreview ? (
-                            <div className="relative">
-                              <img
-                                src={kycData.backPreview}
-                                alt="Verso"
-                                className="w-full h-48 object-cover rounded-lg border-2 border-gray-600"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setKycData({ ...kycData, document_back: null, backPreview: null })}
-                                className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-red-500 transition-colors">
-                              <Upload className="w-12 h-12 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-400">Cliquez pour telecharger</p>
-                              <p className="text-xs text-gray-500 mt-1">PNG, JPG jusqu'a 5MB</p>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleFileChange(e, 'back')}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-                        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <Camera className="w-4 h-4 inline mr-2" />
+                        Verso de la carte d'identité *
+                      </label>
+                      <div className="relative">
+                        {kycData.backPreview ? (
+                          <div className="relative">
+                            <img
+                              src={kycData.backPreview}
+                              alt="Verso"
+                              className="w-full h-48 object-cover rounded-lg border-2 border-gray-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setKycData({ ...kycData, document_back: null, backPreview: null })}
+                              className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 rounded-lg text-white"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-red-500 transition-colors">
+                            <Upload className="w-12 h-12 text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-400">Cliquez pour telecharger</p>
+                            <p className="text-xs text-gray-500 mt-1">PNG, JPG jusqu'a 5MB</p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleFileChange(e, 'back')}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
                       </div>
-                    )}
+                    </div>
 
                     <button
                       type="submit"
-                      disabled={kycLoading || !kycData.document_front}
+                      disabled={kycLoading || !kycData.document_front || !kycData.document_back}
                       className="w-full py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-lg transition-all disabled:opacity-50"
                     >
                       {kycLoading ? 'Envoi en cours...' : 'Soumettre les documents'}

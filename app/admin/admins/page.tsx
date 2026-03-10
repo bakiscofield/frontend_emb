@@ -20,6 +20,7 @@ interface Admin {
   id: number;
   username: string;
   email?: string;
+  role?: string;
   is_active: boolean;
   created_at: string;
   permissions: Permission[];
@@ -28,7 +29,7 @@ interface Admin {
 
 export default function AdminManagement() {
   const router = useRouter();
-  const { admin, isAdmin, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, logoutAdmin, hasPermission } = useAuthStore();
 
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [allPermissions, setAllPermissions] = useState<{ [key: string]: Permission[] }>({});
@@ -37,12 +38,18 @@ export default function AdminManagement() {
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ username: '', email: '' });
+  const [newAdmin, setNewAdmin] = useState({ username: '', email: '', role: 'agent' });
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasPermission('MANAGE_ADMINS')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchAdmins();
@@ -84,6 +91,7 @@ export default function AdminManagement() {
   const handleSavePermissions = async () => {
     if (!selectedAdmin) return;
 
+    setSubmitting(true);
     try {
       await permissionsAPI.updateAdminPermissions(
         selectedAdmin.id.toString(),
@@ -94,6 +102,8 @@ export default function AdminManagement() {
       fetchAdmins();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -105,14 +115,17 @@ export default function AdminManagement() {
       return;
     }
 
+    setSubmitting(true);
     try {
       await adminAPI.createAdmin(newAdmin);
-      toast.success('Administrateur créé ! Les identifiants ont été envoyés par email.');
+      toast.success('Agent créé ! Les identifiants ont été envoyés par email.');
       setShowCreateModal(false);
-      setNewAdmin({ username: '', email: '' });
+      setNewAdmin({ username: '', email: '', role: 'agent' });
       fetchAdmins();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -155,13 +168,14 @@ export default function AdminManagement() {
     <>
       <Header
         title="EMILE TRANSFER"
-        subtitle="Gestion des Administrateurs"
+        subtitle="Gestion des Agents"
         userName={admin?.username || 'Admin'}
         onLogout={() => {
           logoutAdmin();
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin?.permissions || []}
       >
         <NotificationBell />
       </Header>
@@ -170,12 +184,12 @@ export default function AdminManagement() {
         <div className="cyber-grid"></div>
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-8">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Gestion des Administrateurs</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Gestion des Agents</h1>
             <button
               onClick={() => setShowCreateModal(true)}
               className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2 text-sm sm:text-base bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all"
             >
-              + Nouvel Admin
+              + Nouvel Agent
             </button>
           </div>
 
@@ -196,6 +210,13 @@ export default function AdminManagement() {
                     }`}>
                       {admin.is_active ? 'Actif' : 'Désactivé'}
                     </span>
+                    <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-medium ${
+                      admin.role === 'admin'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}>
+                      {admin.role === 'admin' ? 'Admin' : 'Agent'}
+                    </span>
                   </div>
                   {admin.email && (
                     <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2 truncate">{admin.email}</p>
@@ -206,12 +227,14 @@ export default function AdminManagement() {
                   </p>
                 </div>
                 <div className="flex sm:flex-col gap-2 w-full sm:w-auto">
+                  {hasPermission('MANAGE_PERMISSIONS') && (
                   <button
                     onClick={() => handleOpenPermissions(admin)}
                     className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm whitespace-nowrap"
                   >
                     Permissions
                   </button>
+                  )}
                   <button
                     onClick={() => handleToggleStatus(admin)}
                     className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm whitespace-nowrap ${
@@ -319,9 +342,17 @@ export default function AdminManagement() {
                     handleSavePermissions();
                   }}
                   type="button"
-                  className="flex-1 py-2 sm:py-2.5 text-xs sm:text-sm md:text-base bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold"
+                  disabled={submitting}
+                  className="flex-1 py-2 sm:py-2.5 text-xs sm:text-sm md:text-base bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Enregistrer
+                  {submitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      En cours...
+                    </>
+                  ) : (
+                    'Enregistrer'
+                  )}
                 </button>
                 <button
                   onClick={(e) => {
@@ -342,7 +373,7 @@ export default function AdminManagement() {
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
             <div className="bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-md w-full border border-gray-700">
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Créer un Administrateur</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Créer un Agent</h2>
 
               <form onSubmit={handleCreateAdmin} className="space-y-3 sm:space-y-4">
                 <div>
@@ -368,18 +399,59 @@ export default function AdminManagement() {
                   <p className="text-gray-400 text-xs sm:text-sm mt-1">Un mot de passe sera généré automatiquement et envoyé à cette adresse</p>
                 </div>
 
+                <div>
+                  <label className="block text-gray-300 mb-1.5 sm:mb-2 font-medium text-sm sm:text-base">Rôle</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewAdmin({ ...newAdmin, role: 'agent' })}
+                      className={`flex-1 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg font-medium transition-all ${
+                        newAdmin.role === 'agent'
+                          ? 'bg-emerald-600 text-white border-2 border-emerald-400'
+                          : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      Agent
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewAdmin({ ...newAdmin, role: 'admin' })}
+                      className={`flex-1 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg font-medium transition-all ${
+                        newAdmin.role === 'admin'
+                          ? 'bg-blue-600 text-white border-2 border-blue-400'
+                          : 'bg-gray-700 text-gray-300 border-2 border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      Admin
+                    </button>
+                  </div>
+                  <p className="text-gray-400 text-xs sm:text-sm mt-1">
+                    {newAdmin.role === 'admin'
+                      ? 'Accès complet à toutes les fonctionnalités'
+                      : 'Accès limité : transactions et commissions'}
+                  </p>
+                </div>
+
                 <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold"
+                    disabled={submitting}
+                    className="flex-1 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-red-500/50 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Créer
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        En cours...
+                      </>
+                    ) : (
+                      'Créer'
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
-                      setNewAdmin({ username: '', email: '' });
+                      setNewAdmin({ username: '', email: '', role: 'agent' });
                     }}
                     className="flex-1 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold"
                   >

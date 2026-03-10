@@ -26,7 +26,7 @@ interface PaymentMethod {
 
 export default function PaymentMethodsPage() {
   const router = useRouter();
-  const { admin, isAdmin, isAuthenticated, logoutAdmin } = useAuthStore();
+  const { admin, isAdmin, isAuthenticated, logoutAdmin, hasPermission } = useAuthStore();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
@@ -44,6 +44,11 @@ export default function PaymentMethodsPage() {
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       router.push('/admin/login');
+      return;
+    }
+    if (!hasPermission('MANAGE_PAYMENT_METHODS')) {
+      toast.error('Vous n\'avez pas la permission d\'accéder à cette page');
+      router.push('/admin/dashboard');
       return;
     }
     fetchMethods();
@@ -151,6 +156,7 @@ export default function PaymentMethodsPage() {
           router.push('/admin/login');
         }}
         showAdminNav={true}
+        adminPermissions={admin.permissions || []}
       />
 
       <div className="min-h-screen p-3 sm:p-6 relative">

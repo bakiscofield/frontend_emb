@@ -59,9 +59,9 @@ export default function AdminLoginPage() {
           </div>
           <div className="flex items-center justify-center gap-3 mb-2">
             <Shield className="w-8 h-8 text-emile-green animate-pulse" />
-            <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Espace Agent</h1>
           </div>
-          <p className="text-gray-600">Espace sécurisé pour les administrateurs</p>
+          <p className="text-gray-600">Espace sécurisé pour les agents</p>
         </div>
 
         {/* Formulaire avec style sombre (vert pour admin) */}

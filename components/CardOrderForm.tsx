@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 import AnimatedInput from './AnimatedInput';
+import PointDeVenteSelector from './PointDeVenteSelector';
 import toast from 'react-hot-toast';
 
 interface Field {
@@ -22,11 +23,13 @@ interface CardOrderFormProps {
   onSubmit: (formData: Record<string, any>) => Promise<void>;
   onCancel: () => void;
   loading: boolean;
+  onPointDeVenteChange?: (data: { pointDeVenteId: number | null; clientLatitude: number | null; clientLongitude: number | null }) => void;
 }
 
-export default function CardOrderForm({ fields, onSubmit, onCancel, loading }: CardOrderFormProps) {
+export default function CardOrderForm({ fields, onSubmit, onCancel, loading, onPointDeVenteChange }: CardOrderFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [selectedPdVId, setSelectedPdVId] = useState<number | null>(null);
 
   // Organisation des champs par étapes
   const stepGroups = {
@@ -51,11 +54,16 @@ export default function CardOrderForm({ fields, onSubmit, onCancel, loading }: C
       fields: ['delivery_mode', 'delivery_fees', 'delivery_address']
     },
     5: {
+      title: 'Point de retrait',
+      icon: '📍',
+      fields: ['__point_de_vente__']
+    },
+    6: {
       title: 'Vérification d\'identité',
       icon: '🆔',
       fields: ['id_type', 'id_document']
     },
-    6: {
+    7: {
       title: 'Confirmation',
       icon: '✅',
       fields: ['confirm_info', 'accept_terms']
@@ -399,7 +407,17 @@ export default function CardOrderForm({ fields, onSubmit, onCancel, loading }: C
           exit={{ opacity: 0, x: -20 }}
           className="space-y-3 sm:space-y-4 md:space-y-6"
         >
-          {getCurrentStepFields().map(renderField)}
+          {currentStep === 5 ? (
+            <PointDeVenteSelector
+              selectedId={selectedPdVId}
+              onSelect={(data) => {
+                setSelectedPdVId(data.pointDeVenteId);
+                onPointDeVenteChange?.(data);
+              }}
+            />
+          ) : (
+            getCurrentStepFields().map(renderField)
+          )}
         </motion.div>
 
         {/* Boutons de navigation */}

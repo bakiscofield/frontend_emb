@@ -74,7 +74,7 @@ export default function PaymentSyntaxModal({
 
             <div className="text-gray-400 text-xs sm:text-sm">
               Une fois le paiement effectué, veuillez envoyer la référence de paiement comme indiqué.
-              Votre transaction sera validée par un administrateur.
+              Votre transaction sera validée par un agent.
             </div>
           </div>
         );
@@ -141,7 +141,7 @@ export default function PaymentSyntaxModal({
 
             <div className="text-gray-400 text-xs sm:text-sm">
               Le lien s'ouvrira dans un nouvel onglet. Une fois le paiement effectué,
-              votre transaction sera automatiquement enregistrée et validée par un administrateur.
+              votre transaction sera automatiquement enregistrée et validée par un agent.
             </div>
           </div>
         );

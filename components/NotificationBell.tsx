@@ -27,14 +27,13 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { token } = useAuthStore();
 
-  // Polling pour récupérer les notifications toutes les 10 secondes
+  // Polling pour récupérer les notifications toutes les 30 secondes
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        if (!token) {
-          console.log('[Notifications] Pas de token disponible');
-          return;
-        }
+        if (!token) return;
+        // Ne pas poll si l'onglet est en arrière-plan
+        if (document.hidden) return;
 
         const response = await axios.get<{ success: boolean; data: NotificationData }>(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/notifications`,
@@ -46,15 +45,14 @@ export default function NotificationBell() {
         if (response.data.success) {
           setNotifications(response.data.data.notifications);
           setUnreadCount(response.data.data.unread_count);
-          console.log('[Notifications] Récupérées:', response.data.data.notifications.length);
         }
       } catch (error: any) {
-        console.error('[Notifications] Erreur lors de la récupération:', error.response?.data || error.message);
+        // Silently ignore polling errors
       }
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000); // Poll toutes les 10 secondes
+    const interval = setInterval(fetchNotifications, 30000); // Poll toutes les 30 secondes
 
     return () => clearInterval(interval);
   }, [token]);
@@ -115,7 +113,6 @@ export default function NotificationBell() {
         const deletedNotif = notifications.find(n => n.id === id);
         return deletedNotif && !deletedNotif.is_read ? Math.max(0, prev - 1) : prev;
       });
-      console.log('[Notifications] Notification supprimée:', id);
     } catch (error) {
       console.error('[Notifications] Erreur lors de la suppression:', error);
     }
@@ -139,7 +136,6 @@ export default function NotificationBell() {
       );
 
       setNotifications(prev => prev.filter(n => !n.is_read));
-      console.log('[Notifications] Toutes les notifications lues supprimées');
     } catch (error) {
       console.error('[Notifications] Erreur lors du nettoyage:', error);
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck, FileText, Settings as SettingsIcon, Tag } from 'lucide-react';
+import { LogOut, User, Users, UserCog, Mail, MessageCircle, FileCheck, FileText, Settings as SettingsIcon, Tag, MapPin, Wallet } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import VerifiedBadge from './VerifiedBadge';
@@ -13,13 +13,16 @@ interface HeaderProps {
   onProfileClick?: () => void;
   showLogout?: boolean;
   showAdminNav?: boolean;
+  adminPermissions?: string[];
   children?: React.ReactNode;
   isVerified?: boolean;
 }
 
-export default function Header({ title, subtitle, userName, onLogout, onProfileClick, showLogout = true, showAdminNav = false, children, isVerified = false }: HeaderProps) {
+export default function Header({ title, subtitle, userName, onLogout, onProfileClick, showLogout = true, showAdminNav = false, adminPermissions = [], children, isVerified = false }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  const hasAnyPerm = (...codes: string[]) => codes.some(c => adminPermissions.includes(c));
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur-md shadow-lg border-b-2 border-emile-red/30" style={{ background: 'linear-gradient(135deg, #F8F9FA 0%, #FFF8F8 50%, #F5F5F5 100%)' }}>
@@ -119,6 +122,7 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
         <div className="border-t border-gray-200">
           <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-2 sm:py-3">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {(adminPermissions.length === 0 || hasAnyPerm('VIEW_TRANSACTIONS', 'VALIDATE_TRANSACTIONS')) && (
               <button
                 onClick={() => router.push('/admin/dashboard')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -131,6 +135,22 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <Users className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Dashboard</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_COMMISSIONS', 'MANAGE_COMMISSIONS') && (
+              <button
+                onClick={() => router.push('/admin/commissions')}
+                className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
+                  pathname === '/admin/commissions'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                }`}
+                title="Commissions"
+              >
+                <Wallet className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Commissions</span>
+              </button>
+              )}
+              {hasAnyPerm('view_users') && (
               <button
                 onClick={() => router.push('/admin/users')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -143,6 +163,8 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <Users className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Utilisateurs</span>
               </button>
+              )}
+              {hasAnyPerm('MANAGE_ADMINS') && (
               <button
                 onClick={() => router.push('/admin/admins')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -150,11 +172,13 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                     ? 'bg-blue-500 text-white'
                     : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
                 }`}
-                title="Administrateurs"
+                title="Agents"
               >
                 <UserCog className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Administrateurs</span>
+                <span className="hidden sm:inline">Agents</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_NEWSLETTERS', 'CREATE_NEWSLETTERS') && (
               <button
                 onClick={() => router.push('/admin/newsletters')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -167,6 +191,8 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <Mail className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Newsletters</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_EMAIL_TEMPLATES', 'MANAGE_EMAIL_TEMPLATES') && (
               <button
                 onClick={() => router.push('/admin/email-templates')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -179,6 +205,8 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <FileText className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Templates</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_CHAT', 'MANAGE_CHAT') && (
               <button
                 onClick={() => router.push('/admin/chat')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -191,6 +219,8 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <MessageCircle className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Chat</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_KYC', 'MANAGE_KYC') && (
               <button
                 onClick={() => router.push('/admin/kyc')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -203,6 +233,8 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <FileCheck className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">KYC</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_PROMO_CODES', 'MANAGE_PROMO_CODES') && (
               <button
                 onClick={() => router.push('/admin/promo-codes')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -215,6 +247,22 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <Tag className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Codes Promo</span>
               </button>
+              )}
+              {hasAnyPerm('VIEW_POINTS_DE_VENTE', 'MANAGE_POINTS_DE_VENTE') && (
+              <button
+                onClick={() => router.push('/admin/points-de-vente')}
+                className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
+                  pathname === '/admin/points-de-vente'
+                    ? 'bg-teal-500 text-white'
+                    : 'bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200'
+                }`}
+                title="Points de vente"
+              >
+                <MapPin className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Points de vente</span>
+              </button>
+              )}
+              {hasAnyPerm('MANAGE_CONFIG', 'MANAGE_BOOKMAKERS') && (
               <button
                 onClick={() => router.push('/admin/settings')}
                 className={`px-2 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center justify-center ${
@@ -227,6 +275,7 @@ export default function Header({ title, subtitle, userName, onLogout, onProfileC
                 <SettingsIcon className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Paramètres</span>
               </button>
+              )}
             </div>
           </div>
         </div>
